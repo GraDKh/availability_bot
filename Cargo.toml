@@ -1,0 +1,11 @@
+[package]
+name = "big_brother"
+version = "0.1.0"
+authors = ["Dmitry Gordon <>"]
+
+[dependencies]
+telegram-bot = { git = "https://github.com/White-Oak/telegram-bot.git" }
+hyper = "0.10.8"
+hyper-rustls = "0.3.2"
+serde
+serde_json = "0.9.10"
