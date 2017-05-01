@@ -1,53 +1,19 @@
-use telegram_bot;
+use super::user_data;
+
 use serde_json;
 
 use std::fs::OpenOptions;
 use std::io::BufReader;
 use std::io::BufWriter;
 
-pub type ChatID = telegram_bot::Integer;
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum BotState {
-    Initial,
-    WfhStart,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct UserInfo {
-    pub chat_id: ChatID,
-    pub state: BotState,
-    pub first_name: String,
-    pub last_name: String
-}
-
-impl UserInfo {
-    pub fn new(chat_id: ChatID, state: BotState, first_name: String, last_name: String) -> UserInfo {
-        UserInfo {
-            chat_id: chat_id,
-            state: state,
-            first_name: first_name,
-            last_name: last_name
-        }
-    }
-
-    pub fn get_calendar_name(&self) -> Option<String> {
-        if self.first_name.len() == 0 || self.last_name.len() == 0 {
-            None
-        } else {
-            Some(format!("{}.{}", &self.first_name[0..1], self.last_name))
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UserSerializationInfo {
-    pub chat_id: ChatID,
-    pub info: UserInfo
+    pub chat_id: user_data::ChatID,
+    pub info: user_data::UserInfo
 }
 
 impl UserSerializationInfo {
-    pub fn new(chat_id: ChatID, info: UserInfo) -> Self {
+    pub fn new(chat_id: user_data::ChatID, info: user_data::UserInfo) -> Self {
         Self {chat_id: chat_id, info: info}
     }
 }

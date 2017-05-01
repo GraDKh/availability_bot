@@ -5,16 +5,17 @@ extern crate serde_json;
 extern crate telegram_bot;
 #[macro_use]
 extern crate mime;
-extern crate formdata;
 extern crate hyper;
 extern crate hyper_rustls;
+extern crate url;
 
+mod user_data;
 mod save_load_state;
 mod post_to_form;
 
-use save_load_state::ChatID;
-use save_load_state::BotState;
-use save_load_state::UserInfo;
+use user_data::ChatID;
+use user_data::BotState;
+use user_data::UserInfo;
 use save_load_state::UserSerializationInfo;
 use save_load_state::UserCollectionSerializationData;
 use telegram_bot::{Api, MessageType, ListeningMethod, ListeningAction, Chat, ReplyMarkup};
@@ -103,9 +104,11 @@ impl StateProcessor<UserInfo> for BotStateProcessor {
                     self.send_text("No help".to_string());
                     user_info.state = BotState::Initial;
                 } else if answer.starts_with("/whoami") {
-                    let message = format!("{} {}\nIn calendar will be \"{}\"",
-                                          user_info.first_name, user_info.last_name,
-                                          user_info.get_calendar_name().unwrap_or("-".to_string()));
+                    let message =
+                        format!("{} {}\nIn calendar will be \"{}\"",
+                                user_info.first_name,
+                                user_info.last_name,
+                                user_info.get_calendar_name().unwrap_or("-".to_string()));
                     self.send_text(message);
                     user_info.state = BotState::Initial;
                 } else if answer.starts_with("/wfh") {
@@ -154,7 +157,7 @@ impl User {
 struct UserCollection {
     api: Rc<Api>,
     users: HashMap<ChatID, User>,
-    last_message_id: Option<i64>
+    last_message_id: Option<i64>,
 }
 
 impl UserCollection {
@@ -162,58 +165,70 @@ impl UserCollection {
         Self {
             api: api,
             users: HashMap::<ChatID, User>::new(),
-            last_message_id: None
+            last_message_id: None,
         }
     }
 
     fn get_or_create_user<H>(&mut self, chat_id: ChatID, name_getter: &H) -> &mut User
-        where H: Fn() -> (String, String) {
+        where H: Fn() -> (String, String)
+    {
         let api = self.api.clone();
         self.users
             .entry(chat_id)
             .or_insert_with(|| {
                                 let (first_name, last_name) = name_getter();
-                                User::new(UserInfo::new(chat_id, BotState::Initial, first_name, last_name),
+                                User::new(UserInfo::new(chat_id,
+                                                        BotState::Initial,
+                                                        first_name,
+                                                        last_name),
                                           api)
                             })
     }
 
-    fn on_new_message(& mut self, message_id: i64) -> bool {
+    fn on_new_message(&mut self, message_id: i64) -> bool {
         return match self.last_message_id {
-            Some(id) => {
-                if message_id <= id {
-                    false
-                } else {
-                    self.last_message_id = Some(message_id);
-                    true
-                }
-            },
-            None => {
-                self.last_message_id = Some(message_id);
-                true
-            }
+                   Some(id) => {
+                       if message_id <= id {
+                           false
+                       } else {
+                           self.last_message_id = Some(message_id);
+                           true
+                       }
+                   }
+                   None => {
+            self.last_message_id = Some(message_id);
+            true
         }
+               };
     }
 
     fn save(&self, saver: &save_load_state::DataSaver) {
-        let users: Vec<_> = self.users.iter().map(|(id, user)| {
-            UserSerializationInfo::new(id.clone(), user.info.deref().borrow().clone())
-        }).collect();
-        let serialization_data = UserCollectionSerializationData::new(self.last_message_id.unwrap(), users);
+        let users: Vec<_> = self.users
+            .iter()
+            .map(|(id, user)| {
+                     UserSerializationInfo::new(id.clone(), user.info.deref().borrow().clone())
+                 })
+            .collect();
+        let serialization_data =
+            UserCollectionSerializationData::new(self.last_message_id.unwrap(), users);
         saver.save_data(serialization_data);
     }
 
-    fn load(& mut self, loader: &save_load_state::DataSaver) {
-        loader.load_data().map(|user_data| {
-                self.last_message_id = Some(user_data.last_id);
-                for user_info in user_data.users {
-                    self.users.insert(user_info.chat_id, User::new(user_info.info, self.api.clone()));
-                }
-        });
+    fn load(&mut self, loader: &save_load_state::DataSaver) {
+        loader
+            .load_data()
+            .map(|user_data| {
+                     self.last_message_id = Some(user_data.last_id);
+                     for user_info in user_data.users {
+                         self.users
+                             .insert(user_info.chat_id,
+                                     User::new(user_info.info, self.api.clone()));
+                     }
+                 });
     }
 }
 
-const DATA_FILE : &'static str = "data.json";
+const DATA_FILE: &'static str = "data.json";
 
 fn main() {
     let api = Rc::new(Api::from_token(BOT_TOKEN).unwrap());
@@ -246,12 +261,16 @@ fn main() {
                                 };
 
                                 let get_name = || {
-                                    (message.from.first_name.clone(), message.from.last_name.clone().unwrap_or("".to_string()))
+                                    (message.from.first_name.clone(),
+                                     message
+                                         .from
+                                         .last_name
+                                         .clone()
+                                         .unwrap_or("".to_string()))
                                 };
 
                                 {
-                                    let mut user = users_ref
-                                        .get_or_create_user(chat_id, &get_name);
+                                    let mut user = users_ref.get_or_create_user(chat_id, &get_name);
                                     user.state_machine.process(text);
                                 }
 
