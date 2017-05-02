@@ -1,19 +1,20 @@
-use super::user_data;
+use super::user_data::{ChatID, UserInfo};
 
 use serde_json;
 
 use std::fs::OpenOptions;
 use std::io::BufReader;
 use std::io::BufWriter;
+use std::error::Error;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UserSerializationInfo {
-    pub chat_id: user_data::ChatID,
-    pub info: user_data::UserInfo
+    pub chat_id: ChatID,
+    pub info: UserInfo
 }
 
 impl UserSerializationInfo {
-    pub fn new(chat_id: user_data::ChatID, info: user_data::UserInfo) -> Self {
+    pub fn new(chat_id: ChatID, info: UserInfo) -> Self {
         Self {chat_id: chat_id, info: info}
     }
 }
@@ -30,9 +31,12 @@ impl UserCollectionSerializationData {
     }
 }
 
+type SaveResult = Result<(), Box<Error>>;
+type LoadResult = Result<UserCollectionSerializationData, Box<Error>>;
+
 pub trait DataSaver {
-    fn save_data(&self, data: UserCollectionSerializationData);
-    fn load_data(&self) -> Option<UserCollectionSerializationData>;
+    fn save_data(&self, data: UserCollectionSerializationData) -> SaveResult;
+    fn load_data(&self) -> LoadResult;
 }
 
 struct FileDataSaver {
@@ -46,28 +50,24 @@ impl FileDataSaver {
 }
 
 impl DataSaver for FileDataSaver {
-    fn save_data(&self, data: UserCollectionSerializationData) {
+    fn save_data(&self, data: UserCollectionSerializationData) -> SaveResult {
         let file = OpenOptions::new()
             .write(true)
-            .create(true).open(self.path.as_str()).unwrap();
+            .truncate(true)
+            .create(true).open(self.path.as_str())?;
         let writer = BufWriter::new(file);
-        serde_json::to_writer(writer, &data).unwrap();
+        serde_json::to_writer(writer, &data)?;
+        Ok(())
     }
 
-    fn load_data(&self) -> Option<UserCollectionSerializationData> {
+    fn load_data(&self) -> LoadResult {
         let file = OpenOptions::new()
             .read(true)
-            .open(self.path.as_str());
-        match file {
-            Ok(opened_file) => {
-                let reader = BufReader::new(opened_file);
-                let user_data: Result<UserCollectionSerializationData, _> = serde_json::from_reader(reader);
-                match user_data {
-                    Ok(data) => Some(data),
-                    Err(_) => None
-                }
-            }
-            Err(_) => None
+            .open(self.path.as_str())?;
+        let reader = BufReader::new(file);
+        match serde_json::from_reader(reader) {
+            Ok(data) => Ok(data),
+            Err(error) => Err(Box::new(error))
         }
     }
 }

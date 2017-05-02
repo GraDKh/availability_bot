@@ -6,8 +6,10 @@ pub fn get_response_body(name: &str) -> String {
     let mut result = String::new();
     {
         let mut serializer = url::form_urlencoded::Serializer::new(&mut result);
-        serializer.append_pair("entry.1251169846", "Work from home");
         serializer.append_pair("entry.656124513", name);
+        serializer.append_pair("entry.1251169846", "Work from home");
+        serializer.append_pair("entry.1251169846.other_option_response", "");
+        serializer.append_pair("pageHistory", "0,1");
         serializer.append_pair("fvv", "1");
     }
 
@@ -28,7 +30,7 @@ pub fn post_wfh(name: &str) {
             .body(body.as_str())
             .send();
     match res {
-        Ok(result) => println!("http post succeded {:?}", result),
+        Ok(_) => {},
         Err(err) => println!("http post failed {:?}", err),
     };
 }

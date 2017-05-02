@@ -8,25 +8,24 @@ extern crate mime;
 extern crate hyper;
 extern crate hyper_rustls;
 extern crate url;
+#[macro_use]
+extern crate log;
+extern crate env_logger;
 
+mod configuration;
 mod user_data;
 mod save_load_state;
 mod post_to_form;
 
-use user_data::ChatID;
-use user_data::BotState;
-use user_data::UserInfo;
-use save_load_state::UserSerializationInfo;
-use save_load_state::UserCollectionSerializationData;
+use user_data::{ChatID, BotState, UserInfo};
+use save_load_state::{UserSerializationInfo, UserCollectionSerializationData};
 use telegram_bot::{Api, MessageType, ListeningMethod, ListeningAction, Chat, ReplyMarkup};
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::boxed::Box;
-use std::ops::Deref;
-use std::ops::DerefMut;
-
-static BOT_TOKEN: &'static str = "305992740:AAFLC-zkocg7inSmaaIIydeFW6Gs6aBu2Go";
+use std::ops::{Deref, DerefMut};
+use std::error::Error;
 
 trait StateProcessor<State> {
     fn process(&self, state: &mut State, answer: &str);
@@ -73,9 +72,9 @@ impl<'a> BotStateProcessor {
     }
 
     fn send_text(&self, text: String) {
-        self.api
-            .send_message(self.chat_id, text, None, None, None, None)
-            .unwrap();
+        if let Err(error) = self.api.send_message(self.chat_id, text, None, None, None, None) {
+            error!("Failed to send text message to {}: {}", self.chat_id, error.description());
+        }
     }
 
     fn send_menu(&self, menu: Vec<Vec<String>>) {
@@ -85,14 +84,15 @@ impl<'a> BotStateProcessor {
                                                      selective: Some(true),
                                                      ..Default::default()
                                                  });
-        self.api
+        if let Err(error) = self.api
             .send_message(self.chat_id,
                           "choose:".to_string(),
                           None,
                           None,
                           None,
-                          Some(reply_markup))
-            .unwrap();
+                          Some(reply_markup)) {
+            error!("Failed to send menu message to {}: {}", self.chat_id, error.description());
+        }
     }
 }
 
@@ -104,27 +104,47 @@ impl StateProcessor<UserInfo> for BotStateProcessor {
                     self.send_text("No help".to_string());
                     user_info.state = BotState::Initial;
                 } else if answer.starts_with("/whoami") {
-                    let message =
-                        format!("{} {}\nIn calendar will be \"{}\"",
-                                user_info.first_name,
-                                user_info.last_name,
-                                user_info.get_calendar_name().unwrap_or("-".to_string()));
-                    self.send_text(message);
+                    {
+                        let calendar_name = user_info.get_calendar_name().as_ref().map(|name| name.as_str())
+                            .unwrap_or("<not specified>");
+                        let message =
+                            format!("{} {}\nIn calendar will be \"{}\"",
+                                    user_info.get_first_name(),
+                                    user_info.get_last_name(),
+                                    calendar_name);
+                        self.send_text(message);
+                    }
                     user_info.state = BotState::Initial;
+                } else if answer.starts_with("/setmyname") {
+                    self.send_text("Enter the name to be used in calendar".to_string());
+                    user_info.state = BotState::SetName
                 } else if answer.starts_with("/wfh") {
-                    self.send_menu(vec![vec!["yes".to_string(), "no".to_string()]]);
-                    user_info.state = BotState::WfhStart;
+                    if user_info.get_calendar_name().is_some() {
+                        self.send_text("Send work from home for today?".to_string());
+                        self.send_menu(vec![vec!["yes".to_string(), "no".to_string()]]);
+                        user_info.state = BotState::WfhConfirmation;
+                    }
                 }
             }
-            BotState::WfhStart => {
+            BotState::WfhConfirmation => {
                 if answer == "yes" {
                     self.send_text("Applied!".to_string());
                     user_info.state = BotState::Initial;
-                    post_to_form::post_wfh(user_info.get_calendar_name().unwrap().as_str());
+                    {
+                        match user_info.get_calendar_name() {
+                            Some(name) => post_to_form::post_wfh(name.as_str()),
+                            None => error!("WFH: User name for {:?} not specified", user_info)
+                        }
+                    }
                 } else if answer == "no" {
                     self.send_text("Canceled!".to_string());
                     user_info.state = BotState::Initial;
                 }
+            }
+            BotState::SetName => {
+                user_info.set_calendar_name(answer.to_string());
+                self.send_text(format!("Your name will be \"{}\"", answer));
+                user_info.state = BotState::Initial;
             }
         }
     }
@@ -210,33 +230,42 @@ impl UserCollection {
                  })
             .collect();
         let serialization_data =
-            UserCollectionSerializationData::new(self.last_message_id.unwrap(), users);
-        saver.save_data(serialization_data);
+            UserCollectionSerializationData::new(self.last_message_id.expect("last_message_id not specified but save is invoked"), users);
+        match saver.save_data(serialization_data) {
+            Ok(_) => {},
+            Err(error) => error!("Couldn't save bot state: {}", error.description())
+        };
     }
 
     fn load(&mut self, loader: &save_load_state::DataSaver) {
-        loader
-            .load_data()
-            .map(|user_data| {
+        match loader.load_data() {
+            Ok(user_data) => {
                      self.last_message_id = Some(user_data.last_id);
                      for user_info in user_data.users {
                          self.users
                              .insert(user_info.chat_id,
                                      User::new(user_info.info, self.api.clone()));
                      }
-                 });
+                 }
+            Err(error) => warn!("Couldn't load bot state: {:?}", error.description())
+        }
     }
 }
 
-const DATA_FILE: &'static str = "data.json";
-
 fn main() {
-    let api = Rc::new(Api::from_token(BOT_TOKEN).unwrap());
+    env_logger::init().unwrap_or_else(|error| {
+        let message = format!("Couldn't initialize logging {:?}", error);
+        println!("{}", message);
+        panic!("{}", message);
+    });
+
+    let configuration = configuration::Configuration::load();
+    let api = Rc::new(Api::from_token(&configuration.bot_token).expect("Couldn't create API object for bot"));
 
     println!("getMe: {:?}", api.get_me());
 
     let users = RefCell::new(UserCollection::new(api.clone()));
-    let data_saver = save_load_state::creat_data_saver(DATA_FILE);
+    let data_saver = save_load_state::creat_data_saver(&configuration.data_file);
     users.borrow_mut().deref_mut().load(&*data_saver);
     let mut listener = api.deref().listener(ListeningMethod::LongPoll(None));
 
@@ -283,5 +312,5 @@ fn main() {
 
             Result::Ok(ListeningAction::Continue)
         })
-        .unwrap();
+        .expect("Result of the bot listening failed");
 }
