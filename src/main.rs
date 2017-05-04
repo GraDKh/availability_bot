@@ -11,6 +11,8 @@ extern crate url;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
+extern crate chrono;
+extern crate yup_oauth2;
 
 mod configuration;
 mod user_data;
@@ -101,7 +103,7 @@ impl StateProcessor<UserInfo> for BotStateProcessor {
         match user_info.state {
             BotState::Initial => {
                 if answer.starts_with("/help") {
-                    self.send_text("No help".to_string());
+                    self.send_text("https://www.youtube.com/watch?v=yWP6Qki8mWc".to_string());
                     user_info.state = BotState::Initial;
                 } else if answer.starts_with("/whoami") {
                     {
