@@ -72,7 +72,7 @@ impl DataSaver for FileDataSaver {
     }
 }
 
-pub fn creat_data_saver(path: &str) -> Box<DataSaver> {
+pub fn create_data_saver(path: &str) -> Box<DataSaver> {
     Box::new(FileDataSaver::new(path))
 }
 
