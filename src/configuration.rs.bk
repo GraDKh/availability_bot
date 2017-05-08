@@ -10,27 +10,28 @@ static DATA_FILE: &'static str = "data.json";
 #[derive(Serialize, Deserialize)]
 pub struct Configuration {
     pub bot_token: String,
-    pub data_file: String,
+    pub data_file: String
 }
 
 impl Configuration {
     pub fn load() -> Configuration {
-        let file = OpenOptions::new().read(true).open(CONGIGURATION_FILE);
+        let file = OpenOptions::new()
+            .read(true)
+            .open(CONGIGURATION_FILE);
         match file {
             Ok(opened_file) => {
                 let reader = BufReader::new(opened_file);
                 let configuration: Result<Configuration, _> = serde_json::from_reader(reader);
                 match configuration {
                     Ok(conf) => conf,
-                    Err(err) => {
+                    Err(err) => { 
                         error!("Couldn't deserealize config: {:?}", err);
-                        Default::default()
-                    }
+                        Default::default() }
                 }
             }
             Err(err) => {
                 warn!("Coludn't open configuration file {:?}", err);
-                Default::default()
+                Default::default() 
             }
         }
     }
@@ -38,9 +39,6 @@ impl Configuration {
 
 impl Default for Configuration {
     fn default() -> Self {
-        Self {
-            bot_token: BOT_TOKEN.to_string(),
-            data_file: DATA_FILE.to_string(),
-        }
+        Self {bot_token: BOT_TOKEN.to_string(), data_file: DATA_FILE.to_string()}
     }
 }

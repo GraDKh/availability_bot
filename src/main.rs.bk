@@ -1,237 +1,46 @@
+#[macro_use]
+extern crate serde_derive;
+extern crate serde;
+extern crate serde_json;
 extern crate telegram_bot;
+#[macro_use]
+extern crate mime;
 extern crate hyper;
 extern crate hyper_rustls;
+extern crate url;
+#[macro_use]
+extern crate log;
+extern crate env_logger;
+extern crate chrono;
+extern crate yup_oauth2;
 
-use telegram_bot::{Api, MessageType, ListeningMethod, ListeningAction, Chat, ReplyMarkup};
-use std::collections::HashMap;
-use std::rc::Rc;
-use std::cell::RefCell;
-use std::boxed::Box;
-use std::ops::Deref;
-use std::ops::DerefMut;
+mod basic_structures;
+mod message_processor;
+mod configuration;
+mod user_data;
+mod save_load_state;
+mod events_sender;
+mod telegram_api;
 
-static BOT_TOKEN: &'static str = "305992740:AAFLC-zkocg7inSmaaIIydeFW6Gs6aBu2Go";
-
-type ChatID = telegram_bot::Integer;
-
-trait StateProcessor<State> {
-    fn process(&self, state: &State, answer: &str) -> State;
-}
-
-trait StateHolder<State> {
-    fn get_state(&self) -> &State;
-    fn set_state(&mut self, state: State);
-}
-
-struct DialogStateMachine<State, Processor: StateProcessor<State>> {
-    state_holder: Rc<RefCell<StateHolder<State>>>,
-    processor: Box<Processor>,
-}
-
-impl<State, Processor: StateProcessor<State>> DialogStateMachine<State, Processor> {
-    fn new(state_holder: Rc<RefCell<StateHolder<State>>>,
-           processor: Box<Processor>)
-           -> DialogStateMachine<State, Processor> {
-        DialogStateMachine::<State, Processor> {
-            state_holder: state_holder,
-            processor: processor,
-        }
-    }
-
-    fn process(&mut self, answer: &str) {
-        let state_holder = &mut self.state_holder.deref().borrow_mut();
-        let state = self.processor
-            .deref()
-            .process(state_holder.get_state(), answer);
-        state_holder.set_state(state);
-    }
-}
-
-#[derive(Clone)]
-enum BotState {
-    Initial,
-    WfhStart,
-}
-
-struct BotStateProcessor {
-    api: Rc<Api>,
-    chat_id: ChatID,
-}
-
-impl<'a> BotStateProcessor {
-    fn new(api: Rc<Api>, chat_id: ChatID) -> BotStateProcessor {
-        BotStateProcessor {
-            api: api,
-            chat_id: chat_id,
-        }
-    }
-
-    fn send_text(&self, text: String) {
-        self.api
-            .send_message(self.chat_id, text, None, None, None, None)
-            .unwrap();
-    }
-
-    fn send_menu(&self, menu: Vec<Vec<String>>) {
-        let reply_markup = ReplyMarkup::Keyboard(telegram_bot::ReplyKeyboardMarkup {
-                                                     keyboard: menu,
-                                                     one_time_keyboard: Some(true),
-                                                     selective: Some(true),
-                                                     ..Default::default()
-                                                 });
-        self.api
-            .send_message(self.chat_id,
-                          "choose:".to_string(),
-                          None,
-                          None,
-                          None,
-                          Some(reply_markup))
-            .unwrap();
-    }
-}
-
-impl StateProcessor<BotState> for BotStateProcessor {
-    fn process(&self, state: &BotState, answer: &str) -> BotState {
-        match *state {
-            BotState::Initial => {
-                if answer.starts_with("/help") {
-                    self.send_text("No help".to_string());
-                    BotState::Initial
-                } else if answer.starts_with("/wfh") {
-                    self.send_menu(vec![vec!["yes".to_string(), "no".to_string()]]);
-                    BotState::WfhStart
-                } else {
-                    state.clone()
-                }
-            }
-            BotState::WfhStart => {
-                if answer == "yes" {
-                    self.send_text("Applied!".to_string());
-                    BotState::Initial
-                } else if answer == "no" {
-                    self.send_text("Canceled!".to_string());
-                    BotState::Initial
-                } else {
-                    state.clone()
-                }
-            }
-        }
-    }
-}
-
-type StateMachine = DialogStateMachine<BotState, BotStateProcessor>;
-
-struct UserInfo {
-    chat_id: ChatID,
-    state: BotState,
-    name: String,
-}
-
-impl UserInfo {
-    fn new(chat_id: ChatID, state: BotState, name: String) -> UserInfo {
-        UserInfo {
-            chat_id: chat_id,
-            state: state,
-            name: name,
-        }
-    }
-}
-
-impl StateHolder<BotState> for UserInfo {
-    fn get_state(self: &Self) -> &BotState {
-        &self.state
-    }
-
-    fn set_state(self: &mut Self, state: BotState) {
-        self.state = state
-    }
-}
-
-struct User {
-    info: Rc<RefCell<UserInfo>>,
-    state_machine: StateMachine,
-}
-
-impl User {
-    fn new(info: UserInfo, api: Rc<Api>) -> User {
-        let chat_id = info.chat_id;
-        let info = Rc::new(RefCell::from(info));
-        User {
-            info: info.clone(),
-            state_machine: StateMachine::new(info, Box::new(BotStateProcessor::new(api, chat_id))),
-        }
-    }
-}
-
-struct UserCollection {
-    api: Rc<Api>,
-    users: HashMap<ChatID, User>,
-}
-
-impl UserCollection {
-    fn new(api: Rc<Api>) -> UserCollection {
-        UserCollection {
-            api: api,
-            users: HashMap::<ChatID, User>::new(),
-        }
-    }
-
-    fn get_or_create_user<H>(&mut self, chat_id: ChatID, name_getter: &H) -> &mut User
-        where H: Fn() -> String
-    {
-        let api = self.api.clone();
-        self.users
-            .entry(chat_id)
-            .or_insert_with(|| {
-                                User::new(UserInfo::new(chat_id, BotState::Initial, name_getter()),
-                                          api)
-                            })
-    }
-}
+use telegram_bot::Api;
 
 fn main() {
-    let api = Rc::new(Api::from_token(BOT_TOKEN).unwrap());
+    env_logger::init().unwrap_or_else(|error| {
+        let message = format!("Couldn't initialize logging {:?}", error);
+        println!("{}", message);
+        panic!("{}", message);
+    });
 
-    println!("getMe: {:?}", api.get_me());
+    let configuration = configuration::Configuration::load();
 
-    let users = RefCell::new(UserCollection::new(api.clone()));
-    let mut listener = api.deref().listener(ListeningMethod::LongPoll(None));
+    let bot_api = Api::from_token(&configuration.bot_token).expect("Couldn't create API object for bot");
+    info!("getMe: {:?}", bot_api.get_me());
 
-    let users_ref = &users;
-
-    listener.listen(|update| {
-        println!("Got message: {:?}", update);
-
-        update
-            .message
-            .as_ref()
-            .map(|ref message| {
-                match message.msg {
-                    MessageType::Text(ref text) => {
-                        let chat_id = match message.chat {
-                            Chat::Private { id, .. } => id,
-                            Chat::Group { id, .. } => id,
-                            Chat::Channel { id, .. } => id,
-                        };
-
-                        let get_name = || {
-                            let first_name = &message.from.first_name;
-                            match message.from.last_name.as_ref() {
-                                Some(ref surname) => first_name.clone() + surname.as_ref(),
-                                None => first_name.clone(),
-                            }
-                        };
-
-                        let mut users_mut = users.borrow_mut();
-                        let mut user = users_mut
-                            .deref_mut()
-                            .get_or_create_user(chat_id, get_name);
-                        user.state_machine.process(text);
-                    }
-                    _ => {}                    
-                };
-            });
-
-        Result::Ok(ListeningAction::Continue)
-    }).unwrap();
+    let mut message_sender = telegram_api::TelegramMessageSender::new(&bot_api);
+    let mut events_sender = events_sender::CalendarEventsSender::new();
+    let mut data_saver = save_load_state::FileDataSaver::new(&configuration.data_file);
+    let mut message_processor = message_processor::UserCollection::new(&mut message_sender,
+                                                                   &mut events_sender,
+                                                                   &mut data_saver);
+    telegram_api::process_messages(&bot_api, &mut message_processor);
 }

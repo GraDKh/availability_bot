@@ -11,18 +11,13 @@ pub enum BotState {
 pub struct UserName {
     first_name: String,
     last_name: String,
-    calendar_name: Option<String>,
+    calendar_name: Option<String>
 }
 
 impl UserName {
     fn new(first_name: String, last_name: String) -> Self {
-        let mut result = Self {
-            first_name: first_name,
-            last_name: last_name,
-            calendar_name: None,
-        };
-        result.calendar_name = UserName::calculate_calendar_name(&result.first_name,
-                                                                 &result.last_name);
+        let mut result = Self {first_name: first_name, last_name: last_name, calendar_name: None};
+        result.calendar_name = UserName::calculate_calendar_name(&result.first_name, &result.last_name);
         result
     }
 
@@ -39,19 +34,15 @@ impl UserName {
 pub struct UserInfo {
     pub chat_id: ChatID,
     pub state: BotState,
-    pub name: UserName,
+    pub name: UserName 
 }
 
 impl UserInfo {
-    pub fn new(chat_id: ChatID,
-               state: BotState,
-               first_name: String,
-               last_name: String)
-               -> UserInfo {
+    pub fn new(chat_id: ChatID, state: BotState, first_name: String, last_name: String) -> UserInfo {
         UserInfo {
             chat_id: chat_id,
             state: state,
-            name: UserName::new(first_name, last_name),
+            name: UserName::new(first_name, last_name)
         }
     }
 

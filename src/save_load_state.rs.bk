@@ -10,35 +10,29 @@ use std::error::Error;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UserSerializationInfo {
     pub chat_id: ChatID,
-    pub info: UserInfo,
+    pub info: UserInfo
 }
 
 impl UserSerializationInfo {
     pub fn new(chat_id: ChatID, info: UserInfo) -> Self {
-        Self {
-            chat_id: chat_id,
-            info: info,
-        }
+        Self {chat_id: chat_id, info: info}
     }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UserCollectionSerializationData {
     pub last_id: i64,
-    pub users: Vec<UserSerializationInfo>,
+    pub users: Vec<UserSerializationInfo>
 }
 
 impl UserCollectionSerializationData {
     pub fn new(last_id: i64, user_infos: Vec<UserSerializationInfo>) -> Self {
-        Self {
-            last_id: last_id,
-            users: user_infos,
-        }
+        Self {last_id: last_id, users: user_infos}
     }
 }
 
-pub type SaveResult = Result<(), Box<Error>>;
-pub type LoadResult = Result<UserCollectionSerializationData, Box<Error>>;
+type SaveResult = Result<(), Box<Error>>;
+type LoadResult = Result<UserCollectionSerializationData, Box<Error>>;
 
 pub trait DataSaver {
     fn save_data(&self, data: UserCollectionSerializationData) -> SaveResult;
@@ -51,7 +45,7 @@ pub struct FileDataSaver {
 
 impl FileDataSaver {
     pub fn new(path: &str) -> Self {
-        Self { path: path.to_string() }
+        Self {path: path.to_string()}
     }
 }
 
@@ -60,19 +54,21 @@ impl DataSaver for FileDataSaver {
         let file = OpenOptions::new()
             .write(true)
             .truncate(true)
-            .create(true)
-            .open(self.path.as_str())?;
+            .create(true).open(self.path.as_str())?;
         let writer = BufWriter::new(file);
         serde_json::to_writer(writer, &data)?;
         Ok(())
     }
 
     fn load_data(&self) -> LoadResult {
-        let file = OpenOptions::new().read(true).open(self.path.as_str())?;
+        let file = OpenOptions::new()
+            .read(true)
+            .open(self.path.as_str())?;
         let reader = BufReader::new(file);
         match serde_json::from_reader(reader) {
             Ok(data) => Ok(data),
-            Err(error) => Err(Box::new(error)),
+            Err(error) => Err(Box::new(error))
         }
     }
 }
+

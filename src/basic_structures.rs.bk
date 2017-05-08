@@ -14,11 +14,14 @@ pub trait MessageProcessor {
 
 pub trait MessageSender {
     fn send_text(&mut self, chat_id: ChatID, text: String);
-    fn send_menu(&mut self, chat_id: ChatID, text: String, menu: Vec<Vec<String>>);
+    fn send_menu(&mut self,
+                 chat_id: ChatID,
+                 text: String,
+                 menu: Vec<Vec<String>>);
 }
 
-pub type LocalDate = chrono::Date<chrono::Local>;
-
 pub trait EventsSender {
-    fn post_wfh(&mut self, name: &str, date: &LocalDate);
+    fn post_wfh(&mut self,
+                name: &str,
+                date: &LocalDate);
 }
