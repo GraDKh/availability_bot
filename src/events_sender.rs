@@ -1,4 +1,4 @@
-use super::basic_structures::{EventsSender, LocalDate};
+use super::basic_structures::{EventsSender, WfhSingleDay};
 
 use hyper;
 use hyper_rustls;
@@ -6,32 +6,6 @@ use yup_oauth2;
 use yup_oauth2::GetToken;
 use serde::Serialize;
 use serde_json;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct CalendarDate {
-    date: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct WfhSingleDay {
-    summary: String,
-    start: CalendarDate,
-    end: CalendarDate,
-}
-
-impl WfhSingleDay {
-    fn new(name: &str, date: &LocalDate) -> Self {
-        let date = date.format("%Y-%m-%d").to_string();
-        let start = CalendarDate { date };
-        let end = start.clone();
-
-        Self {
-            summary: format!("WFH {}", name),
-            start,
-            end,
-        }
-    }
-}
 
 pub struct CalendarEventsSender {
     accessor: yup_oauth2::ServiceAccountAccess<hyper::Client>,
@@ -79,8 +53,7 @@ impl CalendarEventsSender {
 }
 
 impl EventsSender for CalendarEventsSender {
-    fn post_wfh(&mut self, name: &str, date: &LocalDate) {
-        let wfh = WfhSingleDay::new(name, date);
-        self.post_event(&wfh);
+    fn post_wfh(&mut self, event: WfhSingleDay) {
+        self.post_event(&event);
     }
 }

@@ -47,10 +47,10 @@ impl UserInfo {
                state: BotState,
                first_name: String,
                last_name: String)
-               -> UserInfo {
-        UserInfo {
-            chat_id: chat_id,
-            state: state,
+               -> Self {
+        Self {
+            chat_id,
+            state,
             name: UserName::new(first_name, last_name),
         }
     }

@@ -7,7 +7,104 @@ use chrono;
 use std::ops::Deref;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::ops::DerefMut;
 use std::collections::HashMap;
+use std::mem;
+
+use self::dialog_processing::{ReplyMessage, Dialog, DialogAction, Event, DialogInitializationResult};
+use self::wfh::WfhDialog;
+use self::simple_dialogs::{HelpDialog, WhoAmIDialog};
+
+mod dialog_processing;
+mod wfh;
+mod simple_dialogs;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct DialogsProcessor {
+    active_dialog: Option<Box<Dialog>>
+}
+
+macro_rules! try_find_dialog {
+    ($message:expr, $user_info:expr, $process_message:ident, $DialogType:ident $(, $DialogTypes:ident)*) => {{
+        let dialog_init_result = $DialogType::make($message, $user_info);
+        match dialog_init_result {
+            DialogInitializationResult::NotProcessed => try_find_dialog!($message, $user_info, $process_message $(,$DialogTypes)*),
+            DialogInitializationResult::Finished(reply, event) => { 
+                $process_message(reply, event);
+                None
+            }
+            DialogInitializationResult::StartedProcessing(reply, event, dialog) => {
+                $process_message(reply, event);
+                Some(dialog)
+            }
+        }
+    }};
+
+    ($message:expr, $user_info:expr, $process_message:ident) => {None};
+}
+
+impl DialogsProcessor {
+    fn new() -> Self {
+        Self {active_dialog: None}
+    }
+
+    fn process(&mut self,
+               message: &str,
+               user_info: &mut UserInfo,
+               message_sender: &mut MessageSender,
+               events_sender: &mut EventsSender) {
+        let user_info = RefCell::from(user_info);
+        let mut process_action = |reply: Option<ReplyMessage>, event: Option<Event>| {
+            if let Some(reply) = reply {
+                match reply.menu {
+                            Some(menu) => message_sender.send_menu(user_info.borrow().chat_id, reply.text, menu),
+                            None => message_sender.send_text(user_info.borrow().chat_id, reply.text)
+                };
+            };
+
+            if let Some(event) = event {
+                match event {
+                    Event::WfhSingleDay(event) => events_sender.post_wfh(event)
+                }
+            }
+        };
+        
+        let mut active_dialog : Option<Box<Dialog>> = None;
+        mem::swap(&mut self.active_dialog, &mut active_dialog);
+        self.active_dialog = match active_dialog {
+            Some(mut dialog) => {
+                let result = dialog.try_process(message, user_info.borrow_mut().deref_mut());
+                match result {
+                    DialogAction::ProcessAndContinue(reply, event) => {
+                        process_action(reply, event);
+                        Some(dialog)
+                    }
+                    DialogAction::ProcessAndStop(reply, event) => {
+                        process_action(reply, event);
+                        None
+                    }
+                    DialogAction::Stop => None
+                }
+            }
+            None => {
+                try_find_dialog![message, user_info.borrow_mut().deref_mut(), process_action, 
+                                 WfhDialog, HelpDialog, WhoAmIDialog]
+            }
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct UserState {
+    user_info: UserInfo,
+    dialogs_processor: DialogsProcessor
+}
+
+impl UserState {
+    fn new() {
+        
+    }
+}
 
 trait StateProcessor<State> {
     fn process(&self,
@@ -105,7 +202,7 @@ impl StateProcessor<UserInfo> for BotStateProcessor {
                     {
                         match user_info.get_calendar_name() {
                             Some(name) => {
-                                events_sender.post_wfh(name.as_str(), &chrono::Local::today())
+                                events_sender.post_wfh(WfhSingleDay::new(name.as_str(), &chrono::Local::today()))
                             }
                             None => error!("WFH: User name for {:?} not specified", user_info),
                         }
@@ -258,10 +355,10 @@ mod tests {
 
 use ::basic_structures::*;
 use ::user_data::*;
+use ::message_processor::*;
 use ::save_load_state::{DataSaver, SaveResult, LoadResult, UserCollectionSerializationData, UserSerializationInfo};
 
 use std::cell::Cell;
-use std::borrow::BorrowMut;
 use std::ops::Deref;
 
 enum Event {
@@ -283,8 +380,6 @@ impl EventsSender for MockEventsSender {
         self.events.push(Event::WfhSingleDay{name: name.to_string(), date: date.clone()});
     }
 }
-
-type Menu = Vec<Vec<String>>;
 
 #[derive(Eq, PartialEq, Debug)]
 struct Message {
@@ -315,7 +410,7 @@ impl MessageSender for MockMessageSender {
         self.messages.push(Message::new(chat_id, text, None));
     }
 
-    fn send_menu(&mut self, chat_id: ChatID, text: String, menu: Vec<Vec<String>>) {
+    fn send_menu(&mut self, chat_id: ChatID, text: String, menu: Menu) {
         self.messages.push(Message::new(chat_id, text, Some(menu)));
     }
 }
@@ -348,7 +443,7 @@ fn simple_reply_test(first_name: &str, last_name: Option<&str>, text: &str, expe
     let mut events_sender = MockEventsSender::new();
     let mut data_saver = MockDataSaver::new();
     {
-        let mut message_processor = super::UserCollection::new(&mut message_sender,
+        let mut message_processor = UserCollection::new(&mut message_sender,
                                                     &mut events_sender,
                                                     &mut data_saver);
         
@@ -359,15 +454,46 @@ fn simple_reply_test(first_name: &str, last_name: Option<&str>, text: &str, expe
     assert_eq!(message_sender.messages, vec![Message::new(42, expected_reply, None)]);
 }
 
+macro_rules! define_send_reply_test {
+    ($first_name:expr, $last_name:expr, $([$request:expr, $reply:expr]),+) => (
+        let mut message_sender = MockMessageSender::new();
+        let mut events_sender = MockEventsSender::new();
+        let mut data_saver = MockDataSaver::new();
+        {
+            let mut message_processor = super::UserCollection::new(
+                &mut message_sender,
+                &mut events_sender,
+                &mut data_saver);
+            
+            $(message_processor.process_message(42, $first_name, $last_name, $request);)*
+        }
+
+        assert_eq!(events_sender.events.len(), 0);
+
+        let messages = vec![$(Message::new(42, $reply, None), )*];
+        assert_eq!(data_saver.save_count, Cell::new(messages.len() as i32));
+        assert_eq!(message_sender.messages, messages);
+    )
+}
+
 #[test]
 fn test_help() {
-    simple_reply_test("Vasiliy", None, "/help", "https://www.youtube.com/watch?v=yWP6Qki8mWc");
+    define_send_reply_test!("Vasiliy", None, ["/help", "https://www.youtube.com/watch?v=yWP6Qki8mWc"]);
 }
 
 #[test]
 fn test_whoami() {
-    simple_reply_test("Vasiliy", None, "/whoami", "Vasiliy \nIn calendar will be \"<not specified>\"");
-    simple_reply_test("Vasiliy", Some("Pupkin"), "/whoami", "Vasiliy Pupkin\nIn calendar will be \"V.Pupkin\"");
+    define_send_reply_test!("Vasiliy", None, ["/whoami", "Vasiliy \nIn calendar will be \"<not specified>\""]);
+    define_send_reply_test!("Vasiliy", Some("Pupkin"), ["/whoami", "Vasiliy Pupkin\nIn calendar will be \"V.Pupkin\""]);
+}
+
+#[test]
+fn test_setmyname() {
+    define_send_reply_test!("Vasiliy", None, 
+        ["/whoami", "Vasiliy \nIn calendar will be \"<not specified>\""],
+        ["/setmyname", "Enter the name to be used in calendar"],
+        ["A.Crowley", "Your name will be \"A.Crowley\""],
+        ["/whoami", "Vasiliy \nIn calendar will be \"A.Crowley\""]);
 }
 
 }

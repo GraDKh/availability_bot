@@ -13,6 +13,8 @@ extern crate log;
 extern crate env_logger;
 extern crate chrono;
 extern crate yup_oauth2;
+#[macro_use]
+extern crate lazy_static;
 
 mod basic_structures;
 mod message_processor;
