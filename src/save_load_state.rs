@@ -1,4 +1,5 @@
 use super::user_data::{ChatID, UserInfo};
+use super::message_processor::DialogsProcessor;
 
 use serde_json;
 
@@ -7,22 +8,20 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::error::Error;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize)]
 pub struct UserSerializationInfo {
     pub chat_id: ChatID,
     pub info: UserInfo,
+    pub processor: DialogsProcessor
 }
 
 impl UserSerializationInfo {
-    pub fn new(chat_id: ChatID, info: UserInfo) -> Self {
-        Self {
-            chat_id: chat_id,
-            info: info,
-        }
+    pub fn new(chat_id: ChatID, info: UserInfo, processor: DialogsProcessor) -> Self {
+        Self {chat_id, info, processor}
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize)]
 pub struct UserCollectionSerializationData {
     pub last_id: i64,
     pub users: Vec<UserSerializationInfo>,

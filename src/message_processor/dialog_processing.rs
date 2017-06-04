@@ -65,10 +65,20 @@ pub trait DynamicSerializable: DynamicNameGetter + StaticNameGetter {
     fn from_string(string: &str) -> Self where Self: Sized;
 }
 
-pub trait Dialog: DynamicSerializable {
+pub trait ClonableToDialog {
+    fn clone_to_dialog(&self) -> Box<Dialog>;
+}
+
+pub trait Dialog: DynamicSerializable + ClonableToDialog {
     fn try_process(&mut self, text: &str, user_info: &mut UserInfo) -> DialogAction;
     fn make(initial_message: &str, user_info: &mut UserInfo) -> DialogInitializationResult
         where Self: Sized;
+}
+
+impl<T> ClonableToDialog for T where T: 'static + Dialog + Clone {
+    fn clone_to_dialog(&self) -> Box<Dialog> {
+        Box::new(self.clone())
+    }
 }
 
 lazy_static! {  
@@ -130,5 +140,11 @@ impl<'de> Deserialize<'de> for Box<Dialog> {
         let deserializers = DESERIALIZERS.lock().unwrap();
         let dialog_deserializer = deserializers.get(type_name.as_str()).unwrap(); //FIXME
         Ok(dialog_deserializer(data.as_str()))
+    }
+}
+
+impl Clone for Box<Dialog> {
+    fn clone(&self) -> Box<Dialog> {
+        self.deref().clone_to_dialog()
     }
 }

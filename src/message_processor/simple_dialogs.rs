@@ -15,7 +15,7 @@ trait SimpleDialog {
 }
 
 impl<T> Dialog for T
-    where T: SimpleDialog + DynamicSerializable + Sized
+    where T: 'static + SimpleDialog + DynamicSerializable + Clone + Sized
 {
     fn try_process(&mut self, text: &str, user_info: &mut UserInfo) -> DialogAction {
         panic!("Simple dialog should contain single action");

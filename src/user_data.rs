@@ -1,13 +1,6 @@
 pub type ChatID = super::telegram_bot::Integer;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum BotState {
-    Initial,
-    WfhConfirmation,
-    SetName,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UserName {
     first_name: String,
     last_name: String,
@@ -38,15 +31,13 @@ impl UserName {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UserInfo {
     pub chat_id: ChatID,
-    pub state: BotState,
     pub name: UserName,
 }
 
 impl UserInfo {
-    pub fn new(chat_id: ChatID, state: BotState, first_name: String, last_name: String) -> Self {
+    pub fn new(chat_id: ChatID, first_name: String, last_name: String) -> Self {
         Self {
             chat_id,
-            state,
             name: UserName::new(first_name, last_name),
         }
     }
