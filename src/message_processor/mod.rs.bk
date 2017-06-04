@@ -11,8 +11,7 @@ use std::ops::DerefMut;
 use std::collections::HashMap;
 use std::mem;
 
-use self::dialog_processing::{ReplyMessage, Dialog, DialogAction, Event,
-                              DialogInitializationResult};
+use self::dialog_processing::{ReplyMessage, Dialog, DialogAction, Event, DialogInitializationResult};
 use self::wfh::WfhDialog;
 use self::simple_dialogs::{HelpDialog, WhoAmIDialog};
 
@@ -22,7 +21,7 @@ mod simple_dialogs;
 
 #[derive(Serialize, Deserialize)]
 struct DialogsProcessor {
-    active_dialog: Option<Box<Dialog>>,
+    active_dialog: Option<Box<Dialog>>
 }
 
 macro_rules! try_find_dialog {
@@ -46,7 +45,7 @@ macro_rules! try_find_dialog {
 
 impl DialogsProcessor {
     fn new() -> Self {
-        Self { active_dialog: None }
+        Self {active_dialog: None}
     }
 
     fn process(&mut self,
@@ -58,21 +57,19 @@ impl DialogsProcessor {
         let mut process_action = |reply: Option<ReplyMessage>, event: Option<Event>| {
             if let Some(reply) = reply {
                 match reply.menu {
-                    Some(menu) => {
-                        message_sender.send_menu(user_info.borrow().chat_id, reply.text, menu)
-                    }
-                    None => message_sender.send_text(user_info.borrow().chat_id, reply.text),
+                            Some(menu) => message_sender.send_menu(user_info.borrow().chat_id, reply.text, menu),
+                            None => message_sender.send_text(user_info.borrow().chat_id, reply.text)
                 };
             };
 
             if let Some(event) = event {
                 match event {
-                    Event::WfhSingleDay(event) => events_sender.post_wfh(event),
+                    Event::WfhSingleDay(event) => events_sender.post_wfh(event)
                 }
             }
         };
-
-        let mut active_dialog: Option<Box<Dialog>> = None;
+        
+        let mut active_dialog : Option<Box<Dialog>> = None;
         mem::swap(&mut self.active_dialog, &mut active_dialog);
         self.active_dialog = match active_dialog {
             Some(mut dialog) => {
@@ -86,16 +83,12 @@ impl DialogsProcessor {
                         process_action(reply, event);
                         None
                     }
-                    DialogAction::Stop => None,
+                    DialogAction::Stop => None
                 }
             }
             None => {
-                try_find_dialog![message,
-                                 user_info.borrow_mut().deref_mut(),
-                                 process_action,
-                                 WfhDialog,
-                                 HelpDialog,
-                                 WhoAmIDialog]
+                try_find_dialog![message, user_info.borrow_mut().deref_mut(), process_action, 
+                                 WfhDialog, HelpDialog, WhoAmIDialog]
             }
         }
     }
@@ -104,11 +97,13 @@ impl DialogsProcessor {
 #[derive(Serialize, Deserialize)]
 struct UserState {
     user_info: UserInfo,
-    dialogs_processor: DialogsProcessor,
+    dialogs_processor: DialogsProcessor
 }
 
 impl UserState {
-    fn new() {}
+    fn new() {
+        
+    }
 }
 
 trait StateProcessor<State> {
@@ -207,8 +202,7 @@ impl StateProcessor<UserInfo> for BotStateProcessor {
                     {
                         match user_info.get_calendar_name() {
                             Some(name) => {
-                                events_sender.post_wfh(WfhSingleDay::new(name.as_str(),
-                                                                         &chrono::Local::today()))
+                                events_sender.post_wfh(WfhSingleDay::new(name.as_str(), &chrono::Local::today()))
                             }
                             None => error!("WFH: User name for {:?} not specified", user_info),
                         }
@@ -359,125 +353,108 @@ impl<'a> MessageProcessor for UserCollection<'a> {
 #[cfg(test)]
 mod tests {
 
-    use basic_structures::*;
-    use user_data::*;
-    use message_processor::*;
-    use save_load_state::{DataSaver, SaveResult, LoadResult, UserCollectionSerializationData,
-                          UserSerializationInfo};
+use ::basic_structures::*;
+use ::user_data::*;
+use ::message_processor::*;
+use ::save_load_state::{DataSaver, SaveResult, LoadResult, UserCollectionSerializationData, UserSerializationInfo};
 
-    use std::cell::Cell;
-    use std::ops::Deref;
+use std::cell::Cell;
+use std::ops::Deref;
 
-    enum Event {
-        WfhSingleDay { name: String, date: LocalDate },
+enum Event {
+    WfhSingleDay{name: String, date: LocalDate},
+}
+
+struct MockEventsSender {
+    events: Vec<Event>
+}
+
+impl MockEventsSender {
+    fn new() -> Self {
+        Self {events: Vec::<Event>::new()}
+    }
+}
+
+impl EventsSender for MockEventsSender {
+    fn post_wfh(&mut self, name: &str, date: &LocalDate) {
+        self.events.push(Event::WfhSingleDay{name: name.to_string(), date: date.clone()});
+    }
+}
+
+#[derive(Eq, PartialEq, Debug)]
+struct Message {
+    chat_id: ChatID,
+    text: String,
+    menu: Option<Menu>
+}
+
+impl Message {
+    fn new<S>(chat_id: ChatID, text: S, menu: Option<Menu>) -> Self
+        where S: Into<String> {
+        Self {chat_id, text: text.into(), menu}
+    }
+}
+
+struct MockMessageSender {
+    messages: Vec<Message>
+}
+
+impl MockMessageSender {
+    fn new() -> Self {
+        Self {messages: Vec::<Message>::new()}
+    }
+}
+
+impl MessageSender for MockMessageSender {
+    fn send_text(&mut self, chat_id: ChatID, text: String) {
+        self.messages.push(Message::new(chat_id, text, None));
     }
 
-    struct MockEventsSender {
-        events: Vec<Event>,
+    fn send_menu(&mut self, chat_id: ChatID, text: String, menu: Menu) {
+        self.messages.push(Message::new(chat_id, text, Some(menu)));
+    }
+}
+
+struct MockDataSaver {
+    save_count: Cell<i32>,
+    load_count: Cell<i32>
+}
+
+impl MockDataSaver {
+    fn new() -> Self {
+        Self{save_count: Cell::new(0), load_count: Cell::new(0)}
+    }
+}
+
+impl DataSaver for MockDataSaver {
+    fn save_data(&self, data: UserCollectionSerializationData) -> SaveResult {
+        self.save_count.set(self.save_count.get() + 1);
+        Ok(())
     }
 
-    impl MockEventsSender {
-        fn new() -> Self {
-            Self { events: Vec::<Event>::new() }
-        }
+    fn load_data(&self) -> LoadResult {
+        self.load_count.set(self.load_count.get() + 1);
+        Ok(UserCollectionSerializationData::new(42, Vec::<UserSerializationInfo>::new()))
     }
+}
 
-    impl EventsSender for MockEventsSender {
-        fn post_wfh(&mut self, name: &str, date: &LocalDate) {
-            self.events
-                .push(Event::WfhSingleDay {
-                          name: name.to_string(),
-                          date: date.clone(),
-                      });
-        }
+fn simple_reply_test(first_name: &str, last_name: Option<&str>, text: &str, expected_reply: &str) {
+    let mut message_sender = MockMessageSender::new();
+    let mut events_sender = MockEventsSender::new();
+    let mut data_saver = MockDataSaver::new();
+    {
+        let mut message_processor = UserCollection::new(&mut message_sender,
+                                                    &mut events_sender,
+                                                    &mut data_saver);
+        
+        message_processor.process_message(42, first_name, last_name, text);
     }
+    assert_eq!(events_sender.events.len(), 0);
+    assert_eq!(data_saver.save_count, Cell::new(1));
+    assert_eq!(message_sender.messages, vec![Message::new(42, expected_reply, None)]);
+}
 
-    #[derive(Eq, PartialEq, Debug)]
-    struct Message {
-        chat_id: ChatID,
-        text: String,
-        menu: Option<Menu>,
-    }
-
-    impl Message {
-        fn new<S>(chat_id: ChatID, text: S, menu: Option<Menu>) -> Self
-            where S: Into<String>
-        {
-            Self {
-                chat_id,
-                text: text.into(),
-                menu,
-            }
-        }
-    }
-
-    struct MockMessageSender {
-        messages: Vec<Message>,
-    }
-
-    impl MockMessageSender {
-        fn new() -> Self {
-            Self { messages: Vec::<Message>::new() }
-        }
-    }
-
-    impl MessageSender for MockMessageSender {
-        fn send_text(&mut self, chat_id: ChatID, text: String) {
-            self.messages.push(Message::new(chat_id, text, None));
-        }
-
-        fn send_menu(&mut self, chat_id: ChatID, text: String, menu: Menu) {
-            self.messages
-                .push(Message::new(chat_id, text, Some(menu)));
-        }
-    }
-
-    struct MockDataSaver {
-        save_count: Cell<i32>,
-        load_count: Cell<i32>,
-    }
-
-    impl MockDataSaver {
-        fn new() -> Self {
-            Self {
-                save_count: Cell::new(0),
-                load_count: Cell::new(0),
-            }
-        }
-    }
-
-    impl DataSaver for MockDataSaver {
-        fn save_data(&self, data: UserCollectionSerializationData) -> SaveResult {
-            self.save_count.set(self.save_count.get() + 1);
-            Ok(())
-        }
-
-        fn load_data(&self) -> LoadResult {
-            self.load_count.set(self.load_count.get() + 1);
-            Ok(UserCollectionSerializationData::new(42, Vec::<UserSerializationInfo>::new()))
-        }
-    }
-
-    fn simple_reply_test(first_name: &str,
-                         last_name: Option<&str>,
-                         text: &str,
-                         expected_reply: &str) {
-        let mut message_sender = MockMessageSender::new();
-        let mut events_sender = MockEventsSender::new();
-        let mut data_saver = MockDataSaver::new();
-        {
-            let mut message_processor =
-                UserCollection::new(&mut message_sender, &mut events_sender, &mut data_saver);
-
-            message_processor.process_message(42, first_name, last_name, text);
-        }
-        assert_eq!(events_sender.events.len(), 0);
-        assert_eq!(data_saver.save_count, Cell::new(1));
-        assert_eq!(message_sender.messages,
-                   vec![Message::new(42, expected_reply, None)]);
-    }
-
-    macro_rules! define_send_reply_test {
+macro_rules! define_send_reply_test {
     ($first_name:expr, $last_name:expr, $([$request:expr, $reply:expr]),+) => (
         let mut message_sender = MockMessageSender::new();
         let mut events_sender = MockEventsSender::new();
@@ -499,34 +476,24 @@ mod tests {
     )
 }
 
-    #[test]
-    fn test_help() {
-        define_send_reply_test!("Vasiliy",
-                                None,
-                                ["/help", "https://www.youtube.com/watch?v=yWP6Qki8mWc"]);
-    }
+#[test]
+fn test_help() {
+    define_send_reply_test!("Vasiliy", None, ["/help", "https://www.youtube.com/watch?v=yWP6Qki8mWc"]);
+}
 
-    #[test]
-    fn test_whoami() {
-        define_send_reply_test!("Vasiliy",
-                                None,
-                                ["/whoami",
-                                 "Vasiliy \nIn calendar will be \"<not specified>\""]);
-        define_send_reply_test!("Vasiliy",
-                                Some("Pupkin"),
-                                ["/whoami",
-                                 "Vasiliy Pupkin\nIn calendar will be \"V.Pupkin\""]);
-    }
+#[test]
+fn test_whoami() {
+    define_send_reply_test!("Vasiliy", None, ["/whoami", "Vasiliy \nIn calendar will be \"<not specified>\""]);
+    define_send_reply_test!("Vasiliy", Some("Pupkin"), ["/whoami", "Vasiliy Pupkin\nIn calendar will be \"V.Pupkin\""]);
+}
 
-    #[test]
-    fn test_setmyname() {
-        define_send_reply_test!("Vasiliy",
-                                None,
-                                ["/whoami",
-                                 "Vasiliy \nIn calendar will be \"<not specified>\""],
-                                ["/setmyname", "Enter the name to be used in calendar"],
-                                ["A.Crowley", "Your name will be \"A.Crowley\""],
-                                ["/whoami", "Vasiliy \nIn calendar will be \"A.Crowley\""]);
-    }
+#[test]
+fn test_setmyname() {
+    define_send_reply_test!("Vasiliy", None, 
+        ["/whoami", "Vasiliy \nIn calendar will be \"<not specified>\""],
+        ["/setmyname", "Enter the name to be used in calendar"],
+        ["A.Crowley", "Your name will be \"A.Crowley\""],
+        ["/whoami", "Vasiliy \nIn calendar will be \"A.Crowley\""]);
+}
 
 }

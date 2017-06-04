@@ -1,15 +1,15 @@
-use message_processor::dialog_processing::{YES_NO_MENU, DialogAction, ReplyMessage,
-                                           DialogInitializationResult, DynamicSerializable,
-                                           StaticNameGetter, Dialog, Event};
-use basic_structures::WfhSingleDay;
-use user_data::UserInfo;
+use ::message_processor::dialog_processing::{YES_NO_MENU, DialogAction, ReplyMessage,
+    DialogInitializationResult, DynamicSerializable, StaticNameGetter, Dialog, Event};
+use ::basic_structures::{WfhSingleDay};
+use ::user_data::{UserInfo};
 
 use chrono;
 
 use serde_json;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct InitialState {}
+struct InitialState {
+}
 
 impl InitialState {
     fn new() -> Self {
@@ -21,21 +21,20 @@ impl InitialState {
             match user_info.get_calendar_name() {
                 Some(_) => (WfhState::SetDate(SetDateState::new()), 
                             DialogAction::ProcessAndContinue(Some(ReplyMessage::new("Today?", Some(YES_NO_MENU.clone()))), None)),
-                None => {
-                    (WfhState::Initial(InitialState::new()),
-                     DialogAction::ProcessAndStop(Some(ReplyMessage::new("Please specify your calendar name using /setmyname",
-                                                                         None)),
-                                                  None))
-                }
+                None => (WfhState::Initial(InitialState::new()),
+                         DialogAction::ProcessAndStop(Some(ReplyMessage::new("Please specify your calendar name using /setmyname",
+                            None)), None))
             }
-        } else {
+        }
+        else {
             (WfhState::Initial(InitialState::new()), DialogAction::Stop)
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct SetDateState {}
+struct SetDateState {
+}
 
 impl SetDateState {
     fn new() -> Self {
@@ -44,18 +43,18 @@ impl SetDateState {
 
     fn try_process(&mut self, text: &str, _: &mut UserInfo) -> (WfhState, DialogAction) {
         if text == "yes" {
-            (WfhState::Confirmation(ConfirmationState::new()),
-             DialogAction::ProcessAndContinue(Some(ReplyMessage::new("Confirm event wfh for today?",
-                                                                     Some(YES_NO_MENU.clone()))),
-                                              None))
-        } else {
+            (WfhState::Confirmation(ConfirmationState::new()), 
+            DialogAction::ProcessAndContinue(Some(ReplyMessage::new("Confirm event wfh for today?", Some(YES_NO_MENU.clone()))), None))
+        }
+        else {
             (WfhState::Initial(InitialState::new()), DialogAction::Stop)
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct ConfirmationState {}
+struct ConfirmationState {
+}
 
 impl ConfirmationState {
     fn new() -> Self {
@@ -68,9 +67,9 @@ impl ConfirmationState {
             DialogAction::ProcessAndStop(Some(ReplyMessage::new("Applied!", Some(YES_NO_MENU.clone()))), 
                 Some(Event::WfhSingleDay(WfhSingleDay::new(user_info.get_calendar_name().unwrap(),
                 &chrono::Local::today())))))
-        } else {
-            (WfhState::Initial(InitialState::new()),
-             DialogAction::ProcessAndStop(Some(ReplyMessage::new("Canceled!", None)), None))
+        }
+        else {
+            (WfhState::Initial(InitialState::new()), DialogAction::ProcessAndStop(Some(ReplyMessage::new("Canceled!", None)), None))
         }
     }
 }
@@ -79,12 +78,12 @@ impl ConfirmationState {
 enum WfhState {
     Initial(InitialState),
     SetDate(SetDateState),
-    Confirmation(ConfirmationState),
+    Confirmation(ConfirmationState)
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct WfhDialog {
-    state: WfhState,
+    state: WfhState
 }
 
 impl Dialog for WfhDialog {
@@ -92,7 +91,7 @@ impl Dialog for WfhDialog {
         let (state, result) = match self.state {
             WfhState::Initial(ref mut state) => state.try_process(text, user_info),
             WfhState::SetDate(ref mut state) => state.try_process(text, user_info),
-            WfhState::Confirmation(ref mut state) => state.try_process(text, user_info),
+            WfhState::Confirmation(ref mut state) => state.try_process(text, user_info)
         };
 
         self.state = state;
@@ -100,16 +99,12 @@ impl Dialog for WfhDialog {
         result
     }
 
-    fn make(initial_message: &str, user_info: &mut UserInfo) -> DialogInitializationResult {
-        let mut dialog = Self { state: WfhState::Initial(InitialState::new()) };
+    fn make(initial_message:&str, user_info:&mut UserInfo) -> DialogInitializationResult {
+        let mut dialog = Self {state: WfhState::Initial(InitialState::new())};
         let result = dialog.try_process(initial_message, user_info);
         match result {
-            DialogAction::ProcessAndContinue(reply, event) => {
-                DialogInitializationResult::StartedProcessing(reply, event, Box::new(dialog))
-            }
-            DialogAction::ProcessAndStop(reply, event) => {
-                DialogInitializationResult::Finished(reply, event)
-            }
+            DialogAction::ProcessAndContinue(reply, event) => DialogInitializationResult::StartedProcessing(reply, event, Box::new(dialog)),
+            DialogAction::ProcessAndStop(reply, event) => DialogInitializationResult::Finished(reply, event),
             DialogAction::Stop => DialogInitializationResult::NotProcessed,
         }
     }
@@ -117,7 +112,7 @@ impl Dialog for WfhDialog {
 
 impl DynamicSerializable for WfhDialog {
     fn to_string(&self) -> String {
-        serde_json::to_string(self).unwrap() // FIXME
+        serde_json::to_string(self).unwrap()// FIXME
     }
 
     fn from_string(string: &str) -> Self {
@@ -126,7 +121,7 @@ impl DynamicSerializable for WfhDialog {
 }
 
 impl StaticNameGetter for WfhDialog {
-    fn get_name() -> &'static str {
+    fn get_name() -> &'static str{
         return "wfh-dialog";
     }
 }

@@ -43,11 +43,7 @@ pub struct UserInfo {
 }
 
 impl UserInfo {
-    pub fn new(chat_id: ChatID,
-               state: BotState,
-               first_name: String,
-               last_name: String)
-               -> Self {
+    pub fn new(chat_id: ChatID, state: BotState, first_name: String, last_name: String) -> Self {
         Self {
             chat_id,
             state,
