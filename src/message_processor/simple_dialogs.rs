@@ -1,8 +1,9 @@
 use ::message_processor::dialog_processing::{DialogAction, ReplyMessage,
-    DialogInitializationResult, Dialog, Event};
+    DialogInitializationResult, DynamicSerializable, StaticNameGetter, Dialog, Event};
 use ::user_data::{UserInfo};
 
 use serde::{Serialize, Deserialize};
+use serde_json;
 
 use std::fmt::{Debug};
 
@@ -10,7 +11,7 @@ trait SimpleDialog {
     fn process_message(message:&str, user_info: &mut UserInfo) -> Option<(Option<ReplyMessage>, Option<Event>)> where Self: Sized;
 }
 
-impl<T> Dialog for T where T : SimpleDialog + Sized {
+impl<T> Dialog for T where T : SimpleDialog + DynamicSerializable + Sized {
     fn try_process(&mut self, text: &str, user_info: &mut UserInfo) -> DialogAction {
         panic!("Simple dialog should contain single action");
     }
@@ -38,6 +39,23 @@ impl SimpleDialog for HelpDialog {
     }
 }
 
+impl DynamicSerializable for HelpDialog {
+    fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap() // FIXME
+    }
+
+    fn from_string(string: &str) -> Self {
+        serde_json::from_str::<Self>(string).unwrap() // FIXME
+    }
+}
+
+impl StaticNameGetter for HelpDialog {
+    fn get_name() -> &'static str {
+        return "help-dialog";
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct WhoAmIDialog {
 }
 
@@ -61,6 +79,23 @@ impl SimpleDialog for WhoAmIDialog {
     }
 }
 
+impl DynamicSerializable for WhoAmIDialog {
+    fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap() // FIXME
+    }
+
+    fn from_string(string: &str) -> Self {
+        serde_json::from_str::<Self>(string).unwrap() // FIXME
+    }
+}
+
+impl StaticNameGetter for WhoAmIDialog {
+    fn get_name() -> &'static str {
+        return "whoami-dialog";
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SetMyNameDialog {
 }
 
@@ -93,5 +128,21 @@ impl SimpleDialog for SetMyNameDialog {
         else {
             None
         }
+    }
+}
+
+impl DynamicSerializable for SetMyNameDialog {
+    fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap() // FIXME
+    }
+
+    fn from_string(string: &str) -> Self {
+        serde_json::from_str::<Self>(string).unwrap() // FIXME
+    }
+}
+
+impl StaticNameGetter for SetMyNameDialog {
+    fn get_name() -> &'static str {
+        return "setmyname-dialog";
     }
 }

@@ -1,10 +1,13 @@
 use ::message_processor::dialog_processing::{YES_NO_MENU, DialogAction, ReplyMessage,
-    DialogInitializationResult, Dialog, Event};
+    DialogInitializationResult, DynamicSerializable, StaticNameGetter, Dialog, Event};
 use ::basic_structures::{WfhSingleDay};
 use ::user_data::{UserInfo};
 
 use chrono;
 
+use serde_json;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct InitialState {
 }
 
@@ -29,6 +32,7 @@ impl InitialState {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct SetDateState {
 }
 
@@ -48,6 +52,7 @@ impl SetDateState {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct ConfirmationState {
 }
 
@@ -69,12 +74,14 @@ impl ConfirmationState {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
 enum WfhState {
     Initial(InitialState),
     SetDate(SetDateState),
     Confirmation(ConfirmationState)
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct WfhDialog {
     state: WfhState
 }
@@ -100,5 +107,21 @@ impl Dialog for WfhDialog {
             DialogAction::ProcessAndStop(reply, event) => DialogInitializationResult::Finished(reply, event),
             DialogAction::Stop => DialogInitializationResult::NotProcessed,
         }
+    }
+}
+
+impl DynamicSerializable for WfhDialog {
+    fn to_string(&self) -> String {
+        serde_json::to_string(self).unwrap()// FIXME
+    }
+
+    fn from_string(string: &str) -> Self {
+        serde_json::from_str::<Self>(string).unwrap() // FIXME
+    }
+}
+
+impl StaticNameGetter for WfhDialog {
+    fn get_name() -> &'static str{
+        return "wfh-dialog";
     }
 }

@@ -19,7 +19,7 @@ mod dialog_processing;
 mod wfh;
 mod simple_dialogs;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize)]
 struct DialogsProcessor {
     active_dialog: Option<Box<Dialog>>
 }
@@ -94,7 +94,7 @@ impl DialogsProcessor {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize)]
 struct UserState {
     user_info: UserInfo,
     dialogs_processor: DialogsProcessor
