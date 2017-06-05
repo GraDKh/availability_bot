@@ -6,7 +6,6 @@ authors = ["Dmitry Gordon <>"]
 [dependencies]
 telegram-bot = { git = "https://github.com/White-Oak/telegram-bot.git" }
 mime = "*"
-url = "*"
 hyper = "*"
 hyper-rustls = "*"
 serde_derive = "*"

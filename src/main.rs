@@ -7,7 +7,6 @@ extern crate telegram_bot;
 extern crate mime;
 extern crate hyper;
 extern crate hyper_rustls;
-extern crate url;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
@@ -33,6 +32,7 @@ fn main() {
                                           println!("{}", message);
                                           panic!("{}", message);
                                       });
+    message_processor::init_dialog_types();
 
     let configuration = configuration::Configuration::load();
 

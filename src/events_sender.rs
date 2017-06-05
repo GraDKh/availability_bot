@@ -15,7 +15,7 @@ pub struct CalendarEventsSender {
 impl CalendarEventsSender {
     pub fn new() -> Self {
         let accessor = {
-            let secret = yup_oauth2::service_account_key_from_file(&"Big Brother-7850ee837610.json"
+            let secret = yup_oauth2::service_account_key_from_file(&"./BigBrother-calendarKey.json"
                                                                         .to_string())
                     .unwrap();
 
@@ -30,6 +30,7 @@ impl CalendarEventsSender {
             let connector = hyper::net::HttpsConnector::new(ssl);
             hyper::Client::with_connector(connector)
         };
+        
         Self {
             accessor,
             http_client,

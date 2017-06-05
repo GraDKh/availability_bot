@@ -102,6 +102,14 @@ impl DialogsProcessor {
     }
 }
 
+// TODO: think how to remove copy-paste of dialog types
+pub fn init_dialog_types() {
+    dialog_processing::register_dialog::<WfhDialog>();
+    dialog_processing::register_dialog::<HelpDialog>();
+    dialog_processing::register_dialog::<WhoAmIDialog>();
+    dialog_processing::register_dialog::<SetMyNameDialog>();
+}
+
 #[derive(Serialize, Deserialize)]
 struct UserState {
     user_info: UserInfo,
