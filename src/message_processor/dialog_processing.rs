@@ -1,16 +1,15 @@
 use basic_structures::WfhSingleDay;
+use basic_structures::Menu;
 use user_data::UserInfo;
 use serde::{Serialize, Serializer};
 use serde::ser::SerializeSeq;
-use serde::de::{Deserialize, Deserializer, Visitor, Error, SeqAccess};
+use serde::de::{Deserialize, Deserializer, Visitor, SeqAccess};
 
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Formatter};
 use std::fmt;
 use std::sync::Mutex;
 use std::collections::hash_map::HashMap;
 use std::ops::Deref;
-
-pub type Menu = Vec<Vec<String>>;
 
 pub enum Event {
     WfhSingleDay(WfhSingleDay),

@@ -12,9 +12,11 @@ pub trait MessageProcessor {
                        message: &str);
 }
 
+pub type Menu = Vec<Vec<String>>;
+
 pub trait MessageSender {
     fn send_text(&mut self, chat_id: ChatID, text: String);
-    fn send_menu(&mut self, chat_id: ChatID, text: String, menu: Vec<Vec<String>>);
+    fn send_menu(&mut self, chat_id: ChatID, text: String, menu: Menu);
 }
 
 pub type LocalDate = chrono::Date<chrono::Local>;

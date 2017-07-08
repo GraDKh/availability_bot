@@ -2,10 +2,6 @@ use super::basic_structures::*;
 use super::user_data::*;
 use super::save_load_state::*;
 
-use chrono;
-
-use std::ops::Deref;
-use std::rc::Rc;
 use std::cell::RefCell;
 use std::ops::DerefMut;
 use std::collections::HashMap;
@@ -239,10 +235,9 @@ mod tests {
                           UserSerializationInfo};
 
     use std::cell::Cell;
-    use std::ops::Deref;
 
     enum Event {
-        WfhSingleDay { name: String, date: LocalDate },
+        WfhOneDay(WfhSingleDay),
     }
 
     struct MockEventsSender {
@@ -256,12 +251,9 @@ mod tests {
     }
 
     impl EventsSender for MockEventsSender {
-        fn post_wfh(&mut self, name: &str, date: &LocalDate) {
+        fn post_wfh(&mut self, event: WfhSingleDay) {
             self.events
-                .push(Event::WfhSingleDay {
-                          name: name.to_string(),
-                          date: date.clone(),
-                      });
+                .push(Event::WfhOneDay(event));
         }
     }
 
@@ -320,7 +312,7 @@ mod tests {
     }
 
     impl DataSaver for MockDataSaver {
-        fn save_data(&self, data: UserCollectionSerializationData) -> SaveResult {
+        fn save_data(&self, _: UserCollectionSerializationData) -> SaveResult {
             self.save_count.set(self.save_count.get() + 1);
             Ok(())
         }

@@ -2,12 +2,9 @@ use message_processor::dialog_processing::{DialogAction, ReplyMessage, DialogIni
                                            DynamicSerializable, StaticNameGetter, Dialog, Event};
 use user_data::UserInfo;
 
-use serde::{Serialize, Deserialize};
 use serde_json;
 
-use std::fmt::Debug;
-
-trait SimpleDialog {
+pub trait SimpleDialog {
     fn process_message(message: &str,
                        user_info: &mut UserInfo)
                        -> Option<(Option<ReplyMessage>, Option<Event>)>
@@ -17,7 +14,7 @@ trait SimpleDialog {
 impl<T> Dialog for T
     where T: 'static + SimpleDialog + DynamicSerializable + Clone + Sized
 {
-    fn try_process(&mut self, text: &str, user_info: &mut UserInfo) -> DialogAction {
+    fn try_process(&mut self, _: &str, _: &mut UserInfo) -> DialogAction {
         panic!("Simple dialog should contain single action");
     }
 
@@ -36,7 +33,7 @@ pub struct HelpDialog {}
 
 impl SimpleDialog for HelpDialog {
     fn process_message(message: &str,
-                       user_info: &mut UserInfo)
+                       _: &mut UserInfo)
                        -> Option<(Option<ReplyMessage>, Option<Event>)> {
         if message.starts_with("/help") {
             Some((Some(ReplyMessage::new("https://www.youtube.com/watch?v=yWP6Qki8mWc", None)),
