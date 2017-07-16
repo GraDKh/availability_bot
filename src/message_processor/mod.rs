@@ -389,8 +389,7 @@ mod tests {
                                 None,
                                 ["/whoami",
                                  "Vasiliy \nIn calendar will be \"<not specified>\""],
-                                ["/setmyname", "Enter the name to be used in calendar"],
-                                ["A.Crowley", "Your name will be \"A.Crowley\""],
+                                ["/setmyname A.Crowley", "Your calendar name will be \"A.Crowley\""],
                                 ["/whoami", "Vasiliy \nIn calendar will be \"A.Crowley\""]);
     }
 
