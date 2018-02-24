@@ -2,17 +2,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "type": "lldb-mi",
+            "type": "lldb",
             "request": "launch",
             "name": "Launch Debug",
-            "target": "./target/debug/big_brother-5116d3a68d59d984",
-            "cwd": "${workspaceRoot}"
-        },
-        {
-            "name": "Debug",
-            "type": "lldb-mi",
-            "request": "launch",
-            "target": "./target/debug/big_brother",
+            "program": "./target/debug/big_brother",
             "cwd": "${workspaceRoot}"
         }
     ]
