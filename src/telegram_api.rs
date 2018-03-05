@@ -1,83 +1,101 @@
 use super::basic_structures::{MessageSender, MessageProcessor};
 use super::user_data::ChatID;
 
-use telegram_bot::{Api, ReplyMarkup, ReplyKeyboardMarkup, ListeningMethod, MessageType, Chat,
-                   ListeningAction};
+use telegram_bot::{Api, ReplyMarkup, InlineKeyboardMarkup, UpdateKind, MessageKind, ChatRef, SendMessage,
+InlineKeyboardButton, User, CallbackQuery, CanAnswerCallbackQuery, CanEditMessageReplyMarkup};
 
-use std::error::Error;
+use tokio_core::reactor::Core;
 
-pub struct TelegramMessageSender<'a> {
-    bot_api: &'a Api,
+use futures::Stream;
+
+pub struct TelegramApi {
+    core: Core,
+    bot_api: Api,
+}
+
+impl TelegramApi {
+    pub fn new(bot_token: &str) -> Self {
+        let core = Core::new().unwrap();
+        let bot_api = Api::configure(bot_token).build(core.handle()).unwrap();
+
+        return Self {core, bot_api};
+    }
+
+    pub fn process_messages(self: &mut Self, message_processor: &mut MessageProcessor) {
+        let mut message_sender = TelegramMessageSender::new(&self.bot_api);
+
+        let future = self.bot_api.stream().for_each(|update| {
+            fn get_last_name(user: &User) -> Option<&str> {
+                user.last_name.as_ref().map(|string| string.as_str())
+            }
+
+            if let UpdateKind::Message(message) = update.kind {
+                if let MessageKind::Text {ref data, ..} = message.kind {
+                    if message_processor.is_new_message(update.id) {
+                        message_processor.process_message(& mut message_sender, 
+                                                          message.chat.id(),
+                                                          message.from.first_name.as_str(),
+                                                          get_last_name(&message.from),
+                                                          data);
+                    }
+                        
+                    
+                    // Print received text message to stdout.
+                    println!("<{}>: {}", &message.from.first_name, data);
+                }
+            }
+            else if let UpdateKind::CallbackQuery(ref callback_query) = update.kind {
+                message_processor.process_message(& mut message_sender, 
+                                                  callback_query.message.chat.id(),
+                                                  callback_query.from.first_name.as_str(),
+                                                  get_last_name(&callback_query.from),
+                                                  &callback_query.data);
+
+                message_sender.send_query_reply(&callback_query);
+                println!("<{}>: {}", callback_query.from.first_name, callback_query.data);
+            }
+
+            Ok(())
+        });
+
+        self.core.run(future).unwrap();
+    }
+}
+
+struct TelegramMessageSender<'a> {
+    bot_api : &'a Api
 }
 
 impl<'a> TelegramMessageSender<'a> {
-    pub fn new(bot_api: &'a Api) -> Self {
-        Self { bot_api }
+    fn new(bot_api : &'a Api) -> Self {
+        Self { bot_api}
+    }
+
+    fn send_query_reply(self: &mut Self, query: &CallbackQuery) {
+        self.bot_api.spawn(query.answer(""));
+        self.bot_api.spawn(query.message.edit_reply_markup::<ReplyMarkup>(Option::None));
     }
 }
 
 impl<'a> MessageSender for TelegramMessageSender<'a> {
     fn send_text(&mut self, chat_id: ChatID, text: String) {
-        if let Err(error) = self.bot_api
-               .send_message(chat_id, text, None, None, None, None) {
-            error!("Failed to send text message to {}: {}",
-                   chat_id,
-                   error.description());
-        }
+        let chat = ChatRef::from_chat_id(chat_id);
+        let message_req = SendMessage::new(chat, text);
+        self.bot_api.spawn(message_req);
     }
 
     fn send_menu(&mut self, chat_id: ChatID, text: String, menu: Vec<Vec<String>>) {
-        let reply_markup = ReplyMarkup::Keyboard(ReplyKeyboardMarkup {
-                                                     keyboard: menu,
-                                                     one_time_keyboard: Some(true),
-                                                     selective: Some(true),
-                                                     ..Default::default()
-                                                 });
-        if let Err(error) = self.bot_api
-               .send_message(chat_id, text, None, None, None, Some(reply_markup)) {
-            error!("Failed to send menu message to {}: {}",
-                   chat_id,
-                   error.description());
-        }
+        let reply_markup = (|| -> InlineKeyboardMarkup {
+            let mut result = InlineKeyboardMarkup::new();
+            for row in menu.iter() {
+                let keys_row = row.iter().map(|ref key_name| InlineKeyboardButton::callback(key_name, key_name)).collect();
+                result.add_row(keys_row);
+            }
+            result
+        })();
+        let chat = ChatRef::from_chat_id(chat_id);
+        let mut message_req = SendMessage::new(chat, text);
+        message_req.reply_markup(ReplyMarkup::InlineKeyboardMarkup(reply_markup));
+        self.bot_api.spawn(message_req);
     }
-}
-
-pub fn process_messages(bot_api: &Api, message_processor: &mut MessageProcessor) {
-    let mut listener = bot_api.listener(ListeningMethod::LongPoll(None));
-
-    listener
-        .listen(|update| {
-            info!("Got message: {:?}", update);
-
-            update
-                .message
-                .as_ref()
-                .map(|ref message| {
-                    match message.msg {
-                        MessageType::Text(ref text) => {
-                            if message_processor.is_new_message(update.update_id) {
-                                let chat_id = match message.chat {
-                                    Chat::Private { id, .. } => id,
-                                    Chat::Group { id, .. } => id,
-                                    Chat::Channel { id, .. } => id,
-                                };
-
-                                let last_name = message
-                                    .from
-                                    .last_name
-                                    .as_ref()
-                                    .map(|string| string.as_str());
-                                message_processor.process_message(chat_id,
-                                                                  message.from.first_name.as_str(),
-                                                                  last_name,
-                                                                  text);
-                            }
-                        }
-                        _ => {}
-                    };
-                });
-
-            Result::Ok(ListeningAction::Continue)
-        })
-        .expect("Result of the bot listening failed");
 }

@@ -6,6 +6,7 @@ pub trait MessageProcessor {
     fn is_new_message(&mut self, message_id: i64) -> bool;
 
     fn process_message(&mut self,
+                       message_sender: &mut MessageSender,
                        chat_id: ChatID,
                        first_name: &str,
                        last_name: Option<&str>,

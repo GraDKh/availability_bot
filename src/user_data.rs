@@ -1,4 +1,4 @@
-pub type ChatID = super::telegram_bot::Integer;
+pub type ChatID = super::telegram_bot::ChatId;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UserName {

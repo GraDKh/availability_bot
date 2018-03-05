@@ -122,7 +122,6 @@ impl UserState {
 }
 
 pub struct UserCollection<'a> {
-    message_sender: &'a mut MessageSender,
     events_sender: &'a mut EventsSender,
     data_saver: &'a mut DataSaver,
     users: HashMap<ChatID, UserState>,
@@ -130,12 +129,10 @@ pub struct UserCollection<'a> {
 }
 
 impl<'a> UserCollection<'a> {
-    pub fn new(message_sender: &'a mut MessageSender,
-               events_sender: &'a mut EventsSender,
+    pub fn new(events_sender: &'a mut EventsSender,
                data_saver: &'a mut DataSaver)
                -> Self {
         let mut result = Self {
-            message_sender,
             events_sender,
             data_saver,
             users: HashMap::<ChatID, UserState>::new(),
@@ -179,6 +176,7 @@ impl<'a> UserCollection<'a> {
 
 impl<'a> MessageProcessor for UserCollection<'a> {
     fn process_message(&mut self,
+                       message_sender: &mut MessageSender,
                        chat_id: ChatID,
                        first_name: &str,
                        last_name: Option<&str>,
@@ -192,7 +190,7 @@ impl<'a> MessageProcessor for UserCollection<'a> {
         };
 
         {
-            let mut user = self.users
+            let user = self.users
                 .entry(chat_id)
                 .or_insert_with(|| {
                                     let (first_name, last_name) = get_name();
@@ -201,17 +199,19 @@ impl<'a> MessageProcessor for UserCollection<'a> {
                                                                  last_name), None)
                                 });
             user.dialogs_processor
-                .process(message, &mut user.user_info, self.message_sender, self.events_sender);
+                .process(message, &mut user.user_info, message_sender, self.events_sender);
         }
 
         self.save();
     }
 
     fn is_new_message(&mut self, message_id: i64) -> bool {
+        const MAX_DIFFERENCE: i64 = 1000;
+
         return match self.last_message_id {
                    Some(id) => {
                        if message_id <= id {
-                           false
+                           (id - message_id) >= MAX_DIFFERENCE
                        } else {
                            self.last_message_id = Some(message_id);
                            true

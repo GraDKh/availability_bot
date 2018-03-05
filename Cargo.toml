@@ -4,7 +4,9 @@ version = "0.1.0"
 authors = ["Dmitry Gordon <>"]
 
 [dependencies]
-telegram-bot = { git = "https://github.com/White-Oak/telegram-bot.git" }
+telegram-bot = "0.6.1"
+futures="*"
+tokio-core="*"
 mime = "*"
 hyper = "*"
 hyper-rustls = "*"
