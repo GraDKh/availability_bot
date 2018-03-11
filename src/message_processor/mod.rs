@@ -7,7 +7,7 @@ use std::ops::DerefMut;
 use std::collections::HashMap;
 use std::mem;
 
-use self::dialog_processing::{ReplyMessage, Dialog, DialogAction, Event,
+use self::dialog_processing::{ReplyMessage, Dialog, DialogAction, Event, ChannelMessage,
                               DialogInitializationResult};
 use self::wfh::WfhDialog;
 use self::simple_dialogs::{HelpDialog, WhoAmIDialog, SetMyNameDialog};
@@ -27,11 +27,11 @@ macro_rules! try_find_dialog {
         match dialog_init_result {
             DialogInitializationResult::NotProcessed => try_find_dialog!($message, $user_info, $process_message $(,$DialogTypes)*),
             DialogInitializationResult::Finished(reply, event) => { 
-                $process_message(reply, event);
+                $process_message(reply, event, None);
                 None
             }
             DialogInitializationResult::StartedProcessing(reply, event, dialog) => {
-                $process_message(reply, event);
+                $process_message(reply, event, None);
                 Some(dialog)
             }
         }
@@ -51,7 +51,7 @@ impl DialogsProcessor {
                    message_sender: &mut MessageSender,
                    events_sender: &mut EventsSender) {
         let user_info = RefCell::from(user_info);
-        let mut process_action = |reply: Option<ReplyMessage>, event: Option<Event>| {
+        let mut process_action = |reply: Option<ReplyMessage>, event: Option<Event>, channel_message: Option<ChannelMessage>| {
             if let Some(reply) = reply {
                 match reply.menu {
                     Some(menu) => {
@@ -66,6 +66,10 @@ impl DialogsProcessor {
                     Event::WfhSingleDay(event) => events_sender.post_wfh(event),
                 }
             }
+
+            if let Some(message) = channel_message {
+                message_sender.send_status_to_channel(message.text)
+            }
         };
 
         let mut active_dialog: Option<Box<Dialog>> = None;
@@ -75,11 +79,11 @@ impl DialogsProcessor {
                 let result = dialog.try_process(message, user_info.borrow_mut().deref_mut());
                 match result {
                     DialogAction::ProcessAndContinue(reply, event) => {
-                        process_action(reply, event);
+                        process_action(reply, event, None);
                         Some(dialog)
                     }
-                    DialogAction::ProcessAndStop(reply, event) => {
-                        process_action(reply, event);
+                    DialogAction::ProcessAndStop(reply, event, channel_message) => {
+                        process_action(reply, event, channel_message);
                         None
                     }
                     DialogAction::Stop => None,

@@ -45,7 +45,7 @@ impl CalendarEventsSender {
             .expect("Failed to get auth token");
         let event_string = serde_json::to_string(&event).unwrap();
         let res = self.http_client.post("https://www.googleapis.com/calendar/v3/calendars/fl3daetfrb0ralamlb2hau9q80%40group.calendar.google.com/events?alt=json")
-                  .header(hyper::header::ContentType(mime!(Application/Json)))
+                  .header(hyper::header::ContentType::json())
                   .header(hyper::header::Authorization(hyper::header::Bearer{token: token.access_token}))
                   .body(event_string.as_str()).send();
 

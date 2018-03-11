@@ -4,17 +4,17 @@ version = "0.1.0"
 authors = ["Dmitry Gordon <>"]
 
 [dependencies]
-telegram-bot = "0.6.1"
+telegram-bot = "*"
 futures="*"
 tokio-core="*"
-mime = "*"
-hyper = "*"
-hyper-rustls = "*"
+hyper = "0.10.11"
+hyper-rustls = "0.6.1"
 serde_derive = "*"
 serde = "*"
 serde_json = "*"
 log = "*"
 env_logger = "*"
 chrono = "*"
-yup-oauth2 = { git = "https://github.com/dermesser/yup-oauth2.git" }
+time = "*"
+yup-oauth2 ="*"
 lazy_static = "*"

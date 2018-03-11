@@ -39,19 +39,19 @@ impl TelegramApi {
                                                           data);
                     }
                         
-                    
-                    // Print received text message to stdout.
+                    //message_sender.send_status_to_channel(format!("<{}>: {}", &message.from.first_name, data));
+                     // Print received text message to stdout.
                     println!("<{}>: {}", &message.from.first_name, data);
                 }
             }
             else if let UpdateKind::CallbackQuery(ref callback_query) = update.kind {
+                message_sender.send_query_reply(&callback_query);
                 message_processor.process_message(& mut message_sender, 
                                                   callback_query.message.chat.id(),
                                                   callback_query.from.first_name.as_str(),
                                                   get_last_name(&callback_query.from),
                                                   &callback_query.data);
 
-                message_sender.send_query_reply(&callback_query);
                 println!("<{}>: {}", callback_query.from.first_name, callback_query.data);
             }
 
@@ -72,8 +72,8 @@ impl<'a> TelegramMessageSender<'a> {
     }
 
     fn send_query_reply(self: &mut Self, query: &CallbackQuery) {
-        self.bot_api.spawn(query.answer(""));
         self.bot_api.spawn(query.message.edit_reply_markup::<ReplyMarkup>(Option::None));
+        self.bot_api.spawn(query.answer(""));
     }
 }
 
@@ -96,6 +96,13 @@ impl<'a> MessageSender for TelegramMessageSender<'a> {
         let chat = ChatRef::from_chat_id(chat_id);
         let mut message_req = SendMessage::new(chat, text);
         message_req.reply_markup(ReplyMarkup::InlineKeyboardMarkup(reply_markup));
+        self.bot_api.spawn(message_req);
+    }
+
+    fn send_status_to_channel(&mut self, text: String) {
+        // TODO: move to configuration
+        let chat = ChatRef::ChannelUsername("@BigBrotherEvents".to_owned());
+        let message_req = SendMessage::new(chat, text);
         self.bot_api.spawn(message_req);
     }
 }

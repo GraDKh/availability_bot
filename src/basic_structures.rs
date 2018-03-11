@@ -18,6 +18,7 @@ pub type Menu = Vec<Vec<String>>;
 pub trait MessageSender {
     fn send_text(&mut self, chat_id: ChatID, text: String);
     fn send_menu(&mut self, chat_id: ChatID, text: String, menu: Menu);
+    fn send_status_to_channel(&mut self, text: String);
 }
 
 pub type LocalDate = chrono::Date<chrono::Local>;

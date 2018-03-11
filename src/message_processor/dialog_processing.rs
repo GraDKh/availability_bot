@@ -31,9 +31,21 @@ impl ReplyMessage {
     }
 }
 
+pub struct ChannelMessage {
+    pub text: String
+}
+
+impl ChannelMessage {
+    pub fn new<S>(text: S) -> Self
+        where S: Into<String> 
+    {
+        Self {text: text.into()}
+    }
+}
+
 pub enum DialogAction {
     ProcessAndContinue(Option<ReplyMessage>, Option<Event>),
-    ProcessAndStop(Option<ReplyMessage>, Option<Event>),
+    ProcessAndStop(Option<ReplyMessage>, Option<Event>, Option<ChannelMessage>),
     Stop,
 }
 

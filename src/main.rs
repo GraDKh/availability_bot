@@ -5,14 +5,13 @@ extern crate serde_json;
 extern crate telegram_bot;
 extern crate tokio_core;
 extern crate futures;
-#[macro_use]
-extern crate mime;
 extern crate hyper;
 extern crate hyper_rustls;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
 extern crate chrono;
+extern crate time;
 extern crate yup_oauth2;
 #[macro_use]
 extern crate lazy_static;
@@ -26,7 +25,7 @@ mod events_sender;
 mod telegram_api;
 
 fn main() {
-    env_logger::init().unwrap_or_else(|error| {
+    env_logger::try_init().unwrap_or_else(|error| {
                                           let message = format!("Couldn't initialize logging {:?}",
                                                                 error);
                                           println!("{}", message);
