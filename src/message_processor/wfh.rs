@@ -1,10 +1,11 @@
 use message_processor::dialog_processing::{YES_NO_MENU, DialogAction, ReplyMessage,
                                            DialogInitializationResult, DynamicSerializable,
                                            StaticNameGetter, Dialog, Event, ChannelMessage};
-use basic_structures::{WfhSingleDay, Menu};
+use basic_structures::{LocalDate, LocalDateTime, WholeDayEvent, PartialDayEvent, Menu};
 use user_data::UserInfo;
 
 use chrono;
+use chrono::{Timelike};
 use time;
 
 use serde_json;
@@ -66,6 +67,11 @@ impl ChooseModeStateState {
              DialogAction::ProcessAndContinue(Some(ReplyMessage::new("Confirm event wfh for tomorrow?",
                                                                      Some(YES_NO_MENU.clone()))),
                                               None)),
+            UNTILL_NOW => (WfhState::Confirmation(ConfirmationState::TodayBeforeNow),
+             DialogAction::ProcessAndContinue(Some(ReplyMessage::new("Confirm event wfh for today before now?",
+                                                                     Some(YES_NO_MENU.clone()))),
+                                              None)),
+
 
             _ => (WfhState::Initial(InitialState::new()), DialogAction::Stop)                                
         }
@@ -77,8 +83,8 @@ impl ChooseModeStateState {
 enum ConfirmationState {
     Today,
     Tomorrow,
-    // TodayBeforeNow,
-    // TodayFromNow
+    TodayBeforeNow,
+    TodayFromNow
 }
 
 impl ConfirmationState {
@@ -87,14 +93,20 @@ impl ConfirmationState {
             match self {
                 &mut ConfirmationState::Today =>  (WfhState::Initial(InitialState::new()), 
                            DialogAction::ProcessAndStop(Some(ReplyMessage::new("Applied!", None)), 
-                           Some(Event::WfhSingleDay(WfhSingleDay::new(user_info.get_calendar_name().unwrap(),
-                           &chrono::Local::today()))),
+                           Some(Event::WholeDay(make_wfh_for_today(user_info.get_calendar_name().unwrap()))),
                            Some(ChannelMessage::new("wfh today")))),
                 &mut ConfirmationState::Tomorrow => (WfhState::Initial(InitialState::new()), 
                            DialogAction::ProcessAndStop(Some(ReplyMessage::new("Applied!", None)), 
-                           Some(Event::WfhSingleDay(WfhSingleDay::new(user_info.get_calendar_name().unwrap(),
-                           &(chrono::Local::today() + time::Duration::days(1))))),
-                           Some(ChannelMessage::new("wfh tommorow"))))
+                           Some(Event::WholeDay(make_wfh_for_tomorrow(user_info.get_calendar_name().unwrap()))),
+                           Some(ChannelMessage::new("wfh tommorow")))),
+                &mut ConfirmationState::TodayBeforeNow => (WfhState::Initial(InitialState::new()), 
+                           DialogAction::ProcessAndStop(Some(ReplyMessage::new("Applied!", None)), 
+                           Some(Event::PartialDay(make_wfh_before_now(user_info.get_calendar_name().unwrap()))),
+                           Some(ChannelMessage::new("wfh today untill now")))),
+                &mut ConfirmationState::TodayFromNow => (WfhState::Initial(InitialState::new()), 
+                           DialogAction::ProcessAndStop(Some(ReplyMessage::new("Applied!", None)), 
+                           Some(Event::PartialDay(make_wfh_from_now(user_info.get_calendar_name().unwrap()))),
+                           Some(ChannelMessage::new("wfh today from now"))))
             }
         } else {
             (WfhState::Initial(InitialState::new()),
@@ -157,4 +169,43 @@ impl StaticNameGetter for WfhDialog {
     fn get_name() -> &'static str {
         return "wfh-dialog";
     }
+}
+
+fn make_wfh_whole_day_event(name: &str,  start_date: &LocalDate, end_date: &LocalDate) -> WholeDayEvent {
+    WholeDayEvent::new(format!("WFH: {}", name), start_date, end_date)
+}
+
+fn make_whf_single_day(name: &str,  date: &LocalDate) -> WholeDayEvent {
+    make_wfh_whole_day_event(name, date, date)
+}
+
+fn make_wfh_for_today(name: &str) -> WholeDayEvent {
+    make_whf_single_day(name, &chrono::Local::today())
+}
+
+fn make_wfh_for_tomorrow(name: &str) -> WholeDayEvent {
+    make_whf_single_day(name, &(chrono::Local::today() + time::Duration::days(1)))
+}
+
+fn make_wfh_partial_day_event(name: &str, start_time: &LocalDateTime, end_time: &LocalDateTime) -> PartialDayEvent {
+    PartialDayEvent::new(format!("WFH: {}", name), start_time, end_time)
+}
+
+fn make_same_with_hours(time: &LocalDateTime, hours: u32) -> LocalDateTime {
+    time.with_hour(hours).unwrap().with_minute(0).
+        unwrap().with_second(0).unwrap().with_nanosecond(0).unwrap()
+}
+
+fn make_wfh_before_now(name: &str) -> PartialDayEvent {
+    let now = chrono::Local::now();
+    let day_start = make_same_with_hours(&now, 9);
+
+    make_wfh_partial_day_event(name, &day_start, &now)
+}
+
+fn make_wfh_from_now(name: &str) -> PartialDayEvent {
+    let now = chrono::Local::now();
+    let day_end = make_same_with_hours(&now, 20);
+
+    make_wfh_partial_day_event(name, &now, &day_end)
 }

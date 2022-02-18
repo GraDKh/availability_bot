@@ -63,7 +63,8 @@ impl DialogsProcessor {
 
             if let Some(event) = event {
                 match event {
-                    Event::WfhSingleDay(event) => events_sender.post_wfh(event),
+                    Event::WholeDay(event) => events_sender.post_whole_day(event),
+                    Event::PartialDay(event) => events_sender.post_partial_day(event)
                 }
             }
 
@@ -255,7 +256,7 @@ mod tests {
     }
 
     impl EventsSender for MockEventsSender {
-        fn post_wfh(&mut self, event: WfhSingleDay) {
+        fn post_whole_day(&mut self, event: WfhSingleDay) {
             self.events
                 .push(Event::WfhOneDay(event));
         }

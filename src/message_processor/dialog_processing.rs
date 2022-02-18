@@ -1,5 +1,4 @@
-use basic_structures::WfhSingleDay;
-use basic_structures::Menu;
+use basic_structures::{WholeDayEvent, PartialDayEvent, Menu};
 use user_data::UserInfo;
 use serde::{Serialize, Serializer};
 use serde::ser::SerializeSeq;
@@ -12,7 +11,8 @@ use std::collections::hash_map::HashMap;
 use std::ops::Deref;
 
 pub enum Event {
-    WfhSingleDay(WfhSingleDay),
+    WholeDay(WholeDayEvent),
+    PartialDay(PartialDayEvent)
 }
 
 pub struct ReplyMessage {

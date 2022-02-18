@@ -1,4 +1,4 @@
-use super::basic_structures::{EventsSender, WfhSingleDay};
+use super::basic_structures::{EventsSender, WholeDayEvent, PartialDayEvent};
 
 use hyper;
 use hyper_rustls;
@@ -44,6 +44,7 @@ impl CalendarEventsSender {
             .token(&["https://www.googleapis.com/auth/calendar"])
             .expect("Failed to get auth token");
         let event_string = serde_json::to_string(&event).unwrap();
+        println!("Sending {}", event_string);
         let res = self.http_client.post("https://www.googleapis.com/calendar/v3/calendars/fl3daetfrb0ralamlb2hau9q80%40group.calendar.google.com/events?alt=json")
                   .header(hyper::header::ContentType::json())
                   .header(hyper::header::Authorization(hyper::header::Bearer{token: token.access_token}))
@@ -54,7 +55,11 @@ impl CalendarEventsSender {
 }
 
 impl EventsSender for CalendarEventsSender {
-    fn post_wfh(&mut self, event: WfhSingleDay) {
+    fn post_whole_day(&mut self, event: WholeDayEvent) {
+        self.post_event(&event);
+    }
+
+    fn post_partial_day(&mut self, event: PartialDayEvent) {
         self.post_event(&event);
     }
 }

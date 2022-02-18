@@ -29,20 +29,55 @@ struct CalendarDate {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct WfhSingleDay {
+pub struct WholeDayEvent {
     summary: String,
     start: CalendarDate,
     end: CalendarDate,
 }
 
-impl WfhSingleDay {
-    pub fn new(name: &str, date: &LocalDate) -> Self {
-        let date = date.format("%Y-%m-%d").to_string();
-        let start = CalendarDate { date };
-        let end = start.clone();
+impl WholeDayEvent {
+    pub fn new(text: String, start_date: &LocalDate, end_date: &LocalDate) -> Self {
+        fn format_date(date: &LocalDate) -> String {
+            date.format("%Y-%m-%d").to_string()
+        }
+
+        let start = CalendarDate { date: format_date(start_date) };
+        let end = CalendarDate { date: format_date(end_date) };
 
         Self {
-            summary: format!("WFH {}", name),
+            summary: text,
+            start,
+            end,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CalendarDateTime {
+    #[serde(rename = "dateTime")]
+    date_time: String,
+}
+
+pub type LocalDateTime = chrono::DateTime<chrono::Local>;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PartialDayEvent {
+    summary: String,
+    start: CalendarDateTime,
+    end: CalendarDateTime,
+}
+
+impl PartialDayEvent {
+    pub fn new(text: String, start_date: &LocalDateTime, end_date: &LocalDateTime) -> Self {
+        fn format_date(date: &LocalDateTime) -> String {
+            date.to_rfc3339()
+        }
+
+        let start = CalendarDateTime { date_time: format_date(start_date) };
+        let end = CalendarDateTime { date_time: format_date(end_date) };
+
+        Self {
+            summary: text,
             start,
             end,
         }
@@ -50,5 +85,6 @@ impl WfhSingleDay {
 }
 
 pub trait EventsSender {
-    fn post_wfh(&mut self, event: WfhSingleDay);
+    fn post_whole_day(&mut self, event: WholeDayEvent);
+    fn post_partial_day(&mut self, event: PartialDayEvent);
 }
